@@ -35,6 +35,11 @@ picker. Movies open right away; for a series, pick the season and episode, then 
 
 USB debugging stays on for this to work: anything you allowed on the TV can control it.
 
+## Download
+
+Get the APK from [Releases](../../releases/latest). Each tag like `v1.2.0` builds one, signed with the same release
+key, so a new version installs over the old one.
+
 ## Build
 
 ```bash
@@ -42,4 +47,8 @@ USB debugging stays on for this to work: anything you allowed on the TV can cont
 adb install app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Kotlin, Jetpack Compose (Material 3), minSdk 26.
+Kotlin, Jetpack Compose with Material 3 Expressive and Material You colors, minSdk 26.
+
+A release (`assembleRelease`) is signed when `KEYSTORE_FILE`, `KEYSTORE_PASSWORD` and `KEY_ALIAS` are set, as the
+[release workflow](.github/workflows/release.yml) does from the repo's secrets; `VERSION_NAME` and `VERSION_CODE`
+come from the tag and the run number.

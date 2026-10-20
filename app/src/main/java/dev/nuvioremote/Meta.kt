@@ -13,7 +13,16 @@ import java.net.URL
  * An id is either a movie or a series: both are asked at once, and the one that answers wins.
  */
 object Meta {
-    data class Found(val name: String, val series: Boolean)
+    data class Found(
+        val name: String,
+        val series: Boolean,
+        val poster: String? = null,
+        val background: String? = null,
+        val year: String? = null,       // "2001", "2025–"
+        val genres: List<String> = emptyList(),
+        val rating: String? = null,     // IMDb, "8.9"
+        val runtime: String? = null,    // "179 min"
+    )
 
     private const val CINEMETA = "https://v3-cinemeta.strem.io/meta"
 
@@ -21,10 +30,22 @@ object Meta {
     suspend fun lookup(imdbId: String): Found? = coroutineScope {
         val movie = async { fetch("movie", imdbId) }
         val series = async { fetch("series", imdbId) }
-        movie.await()?.let { Found(it, false) } ?: series.await()?.let { Found(it, true) }
+        movie.await()?.let { found(it, false) } ?: series.await()?.let { found(it, true) }
     }
 
-    private suspend fun fetch(type: String, id: String): String? = withContext(Dispatchers.IO) {
+    private fun found(m: JSONObject, series: Boolean) = Found(
+        name = m.optString("name"),
+        series = series,
+        poster = m.optString("poster").takeIf { it.startsWith("http") },
+        background = m.optString("background").takeIf { it.startsWith("http") },
+        year = m.optString("releaseInfo").takeIf { it.isNotBlank() },
+        genres = m.optJSONArray("genres")?.let { a -> List(a.length()) { a.optString(it) } }.orEmpty().take(3),
+        rating = m.optString("imdbRating").takeIf { it.isNotBlank() },
+        runtime = m.optString("runtime").takeIf { it.isNotBlank() },
+    )
+
+    /** The title's "meta" object, when this type knows the id. */
+    private suspend fun fetch(type: String, id: String): JSONObject? = withContext(Dispatchers.IO) {
         runCatching {
             val c = URL("$CINEMETA/$type/$id.json").openConnection() as HttpURLConnection
             c.connectTimeout = 6000
@@ -33,7 +54,7 @@ object Meta {
             try {
                 if (c.responseCode != 200) return@runCatching null
                 val meta = JSONObject(c.inputStream.bufferedReader().readText()).optJSONObject("meta")
-                meta?.optString("name")?.takeIf { it.isNotBlank() }
+                meta?.takeIf { it.optString("name").isNotBlank() }
             } finally {
                 c.disconnect()
             }
