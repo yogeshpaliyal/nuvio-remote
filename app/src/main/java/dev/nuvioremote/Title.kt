@@ -1,0 +1,50 @@
+package dev.nuvioremote
+
+/** What to open in Nuvio on the TV: a movie, or one episode of a series. */
+data class Title(
+    val imdbId: String,
+    val name: String,
+    val series: Boolean,
+    val season: Int = 1,
+    val episode: Int = 1,
+) {
+    /** Nuvio's own id for the video: "tt0120737" for a movie, "tt42127457:1:4" for an episode. */
+    val videoId: String get() = if (series) "$imdbId:$season:$episode" else imdbId
+
+    /** A shared page: its IMDb id, and whatever its text says about the name and type (null = not said). */
+    data class Shared(val imdbId: String, val name: String, val series: Boolean?)
+
+    companion object {
+        private val IMDB_ID = Regex("""\btt\d{5,}\b""")
+
+        fun isImdbId(s: String) = IMDB_ID.matches(s.trim())
+
+        /** The IMDb id in any text: "tt0120737", "https://m.imdb.com/title/tt0120737/?ref_=…". */
+        fun idIn(text: String): String? = IMDB_ID.find(text)?.value
+
+        /**
+         * What a share brings. Chrome sends the page's URL as the text and its title as the subject
+         * ("The Lord of the Rings: The Fellowship of the Ring (2001) - IMDb"); the IMDb app puts both in the text
+         * ("Agent Kim Reactivated (TV Series 2025– ) ⭐ 7.6 | Action https://m.imdb.com/title/tt42127457/").
+         * Null when there's no IMDb id in it.
+         */
+        fun fromShared(text: String?, subject: String?): Shared? {
+            val all = listOfNotNull(subject, text).joinToString("\n")
+            val id = idIn(all) ?: return null
+            val name = listOfNotNull(subject, text)
+                .flatMap { it.lines() }
+                .map { it.trim() }
+                .firstOrNull { it.isNotEmpty() && !it.startsWith("http") && idIn(it) == null }
+                ?.let(::cleanName)
+                .orEmpty()
+            // The IMDb app says "TV Series"; Chrome's page title doesn't say (Cinemeta will).
+            val series = if (Regex("""TV (Mini )?Series""", RegexOption.IGNORE_CASE).containsMatchIn(all)) true else null
+            return Shared(id, name, series)
+        }
+
+        /** "The Lord of the Rings… (2001) - IMDb" → "The Lord of the Rings…". */
+        private fun cleanName(line: String): String = line
+            .substringBefore("http").substringBefore(" - IMDb").substringBefore(" | ").substringBefore(" (")
+            .substringBefore(" ⭐").trim().trim('"', '“', '”')
+    }
+}
