@@ -15,9 +15,6 @@ jobs:
           distribution: temurin
           java-version: 17
       - uses: gradle/actions/setup-gradle@v4
+      # A check that it builds; the APK to install comes from Releases (no artifact: storage is limited).
       - name: Build the debug APK
         run: ./gradlew assembleDebug
-      - uses: actions/upload-artifact@v4
-        with:
-          name: nuvio-remote-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
