@@ -154,6 +154,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
     val library = remember { Library.get(context) }
     val entries by library.entries.collectAsState()
     var showLibrary by remember { mutableStateOf(false) }
+    var showRemote by remember { mutableStateOf(false) }
     @Suppress("DEPRECATION") val clipboard = LocalClipboardManager.current
 
     // The TV
@@ -422,10 +423,15 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
         }
     }
 
-    BackHandler(enabled = showLibrary) { showLibrary = false }
-    AnimatedContent(targetState = showLibrary, label = "screen") { libraryShown ->
-    if (libraryShown) {
+    BackHandler(enabled = showLibrary || showRemote) { showLibrary = false; showRemote = false }
+    // 0: send, 1: library, 2: remote
+    AnimatedContent(targetState = if (showLibrary) 1 else if (showRemote) 2 else 0, label = "screen") { screen ->
+    if (screen == 1) {
         LibraryScreen(library, onBack = { showLibrary = false }, onOpen = { pick(it, false) }, onPlay = { pick(it, true) })
+        return@AnimatedContent
+    }
+    if (screen == 2) {
+        RemoteScreen(host.trim(), tvName, onBack = { showRemote = false })
         return@AnimatedContent
     }
     val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
@@ -445,6 +451,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
                     )
                 },
                 actions = {
+                    IconButton(onClick = { showRemote = true }, enabled = hostOk) { Icon(AppIcons.Remote, "Remote") }
                     IconButton(onClick = { showLibrary = true }) { Icon(AppIcons.History, "History and saved") }
                 },
                 scrollBehavior = scroll,

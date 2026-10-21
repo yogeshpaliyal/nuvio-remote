@@ -13,6 +13,13 @@ Not affiliated with Nuvio or any streaming service.
 
 ![Skiff — Send to TV](docs/brand/banner.png)
 
+## Remote
+
+The remote icon opens a remote for the TV: a D-pad with OK, Home, Back and Menu, a volume rocker, playback, power,
+and **Type on the TV** (text straight into the TV's search box, instead of its on-screen keyboard). Arrows, volume and
+seek repeat when held. One connection stays open while it's showing, and keys go in order (`cmd input keyevent`,
+about 100 ms each).
+
 ## History and Saved for later
 
 Every title and link you share, paste or play goes to **History** (newest first, with its episode and when), and the bookmark

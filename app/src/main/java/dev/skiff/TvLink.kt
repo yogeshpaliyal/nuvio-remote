@@ -75,6 +75,43 @@ object TvLink {
         }.sortedBy { if (it.pkg == "com.nuvio.tv") 0 else 1 }
     }
 
+    /**
+     * The remote: one connection kept open while it's showing (a new one per key would cost the handshake every
+     * press), and the keys sent in order, one at a time. `cmd input` (about 90 ms on the TV) rather than `input`
+     * (about 130 ms: it starts a Java process). Close it when the remote goes away.
+     */
+    class Remote internal constructor(private val tv: Dadb) : AutoCloseable {
+        private val order = Mutex()
+
+        /** A key (KeyEvent.KEYCODE_*); `long` for a long press. */
+        suspend fun key(code: Int, long: Boolean = false) = run("cmd input keyevent ${if (long) "--longpress " else ""}$code")
+
+        /** Text into the TV's focused field (a search box): spaces as %s, as `input text` wants them. */
+        suspend fun text(s: String) = run("cmd input text " + q(s.replace(" ", "%s")))
+
+        private suspend fun run(command: String) {
+            order.withLock { withContext(Dispatchers.IO) { tv.shell(command) } }
+        }
+
+        override fun close() {
+            runCatching { tv.close() }
+        }
+    }
+
+    /** Off the main thread. A connected remote (it asks the TV to allow this phone, the first time). */
+    suspend fun remote(context: Context, host: String): Remote = lock.withLock {
+        withContext(Dispatchers.IO) {
+            val tv = connect(context, host)
+            try {
+                tv.shell("true")    // connects now: the first key shouldn't wait for it
+                Remote(tv)
+            } catch (e: Exception) {
+                runCatching { tv.close() }
+                throw e
+            }
+        }
+    }
+
     /** A TV app that opens a link (JioHotstar, YouTube…). */
     data class LinkApp(val pkg: String, val component: String) {
         val name: String get() = Links.appName(pkg)
