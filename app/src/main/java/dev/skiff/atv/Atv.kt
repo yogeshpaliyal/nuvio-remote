@@ -121,6 +121,11 @@ object Atv {
         private val started = CompletableDeferred<Unit>()
         @Volatile private var imeCounter = 0
         @Volatile private var fieldCounter = 0
+        /** The TV sent its input method's counters for a focused field: text can go as an edit. */
+        @Volatile private var imeReady = false
+        // The counters of the focused field as the TV's key inject (20) gives them: app_info.counter, counter_field.
+        @Volatile private var focusIme: Int? = null
+        @Volatile private var focusField: Int? = null
         @Volatile private var features = Messages.FEATURES
         @Volatile var closed = false
             private set
@@ -129,8 +134,11 @@ object Atv {
             scope.launch {
                 try {
                     while (true) {
-                        val m = Messages.Remote(ProtoReader.readFrame(socket.inputStream))
-                        if (m.pingVal1 == null) Log.d("Skiff", "TV sent RemoteMessage fields ${m.fields}")
+                        val bytes = ProtoReader.readFrame(socket.inputStream)
+                        val m = Messages.Remote(bytes)
+                        if (m.pingVal1 == null) {
+                            Log.d("Skiff", "TV sent RemoteMessage fields ${m.fields}: ${bytes.joinToString("") { "%02x".format(it) }.take(400)}")
+                        }
                         when {
                             m.configure != null -> {
                                 features = Messages.FEATURES and m.configure.int(1)
@@ -141,8 +149,13 @@ object Atv {
                             m.imeBatchEdit != null -> {
                                 imeCounter = m.imeBatchEdit.int(1)
                                 fieldCounter = m.imeBatchEdit.int(2)
+                                imeReady = true
                             }
-                            m.imeFieldCounter != null -> fieldCounter = m.imeFieldCounter
+                            m.imeFieldCounter != null -> {
+                                focusField = m.imeFieldCounter
+                                m.imeAppCounter?.let { focusIme = it }
+                                imeReady = true
+                            }
                             m.start != null -> started.complete(Unit)
                         }
                     }
@@ -159,17 +172,25 @@ object Atv {
         override suspend fun key(code: Int) = send(Messages.keyInject(code))
 
         /**
-         * Text into the TV's focused field, typed as key presses (Shift held for capitals and symbols): the TV takes
-         * them in any field. Its input method's edit (below) needs counters some TVs never send: only for what a
-         * keyboard can't type (emoji, other scripts).
+         * Text into the TV's focused field. When the TV has sent its input method's counters for the field (it does
+         * when a search box gets focus), as an edit of that field, the way the Google TV app types; the TV ignores
+         * letter keys there. Otherwise as key presses (Shift held for capitals and symbols).
          */
         override suspend fun text(s: String) {
             if (s.isEmpty()) return
             val events = KeyCharacterMap.load(KeyCharacterMap.VIRTUAL_KEYBOARD).getEvents(s.toCharArray())
-            if (events == null) {
-                send(Messages.imeText(imeCounter, fieldCounter, s))
+            if (imeReady || events == null) {
+                // The edit replaces the field's text, so sending it with each pair of counters the TV gave is safe:
+                // the one it takes types it once. Those of the focused field (20) first, then the batch edit's (21).
+                val pairs = listOfNotNull(
+                    focusIme?.let { ime -> focusField?.let { ime to it } },
+                    imeCounter to fieldCounter,
+                ).distinct()
+                Log.d("Skiff", "Text as an IME edit with counters $pairs")
+                for ((ime, field) in pairs) send(Messages.imeText(ime, field, s))
                 return
             }
+            Log.d("Skiff", "Text as key presses (no IME counters from the TV yet)")
             for (e in events) {
                 val modifier = KeyEvent.isModifierKey(e.keyCode)
                 when {

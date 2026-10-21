@@ -58,6 +58,14 @@ class MessagesTest {
         assertEquals(5, Messages.Remote(show).imeFieldCounter)
     }
 
+    @Test fun readsTheFocusedFieldsCounters() {
+        // What a Google TV sent when Nuvio's search box had focus: app_info.counter 260, counter_field 60.
+        val inject = hex("a201350a270884021001188680801038004000620c636f6d2e6e7576696f2e747668ffffffffffffffffff01120a083c1200180020002801")
+        val m = Messages.Remote(inject)
+        assertEquals(260, m.imeAppCounter)
+        assertEquals(60, m.imeFieldCounter)
+    }
+
     @Test fun appLinkBytes() {
         // RemoteMessage { remote_app_link_launch_request (90) { app_link (1): "x" } }: tag 90<<3|2 = 722 = D2 05
         assertArrayEquals(hex("d205030a0178"), Messages.appLink("x"))

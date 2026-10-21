@@ -138,6 +138,8 @@ object Messages {
         val imeBatchEdit = r.message(21)
         /** The focused text field's counter, as the TV announces it (key inject 20, show request 22). */
         val imeFieldCounter: Int? = (r.message(20) ?: r.message(22))?.message(2)?.takeIf { it.has(1) }?.int(1)
+        /** The input method's counter for the focused field: app_info.counter of the TV's key inject (20). */
+        val imeAppCounter: Int? = r.message(20)?.message(1)?.takeIf { it.has(1) }?.int(1)
         val start = r.message(40)
         val fields = r.fields
     }
