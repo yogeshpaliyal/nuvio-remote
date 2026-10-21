@@ -195,6 +195,8 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
     val finder = remember {
         TvFinder(context) { found ->
             tvs = found
+            // A paired TV at a new address (the router moved it) keeps its pairing, found by its name.
+            for (tv in found) Atv.adopt(context, tv.host, tv.name)
             // Usable: USB debugging on, or paired (the Google TV remote protocol).
             fun usable(tv: TvFinder.Tv) = tv.ready || Atv.isPaired(context, tv.host)
             val same = found.firstOrNull { usable(it) && it.name == tvName }
@@ -259,6 +261,8 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
     var pairedRun by remember { mutableIntStateOf(0) }     // paired from the connect card
     val paired = remember(host.trim(), showRemote, showSettings, pairedRun) { hostOk && Atv.isPaired(context, host) }
     val linkVia = remember(host.trim(), showSettings) { Connection.link(context, host) }
+    // Paired with this TV: keep the pairing by its name too, for when its address changes.
+    LaunchedEffect(host.trim(), tvName, paired) { if (paired) Atv.rememberName(context, host, tvName) }
     var adb by remember { mutableStateOf<TvLink.Adb?>(null) }      // null: checking
     var adbRun by remember { mutableIntStateOf(0) }
     LaunchedEffect(host.trim(), adbRun, showRemote, showSettings) {

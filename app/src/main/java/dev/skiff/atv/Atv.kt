@@ -111,8 +111,39 @@ object Atv {
     /** This phone paired with that TV (at that address) before. */
     fun isPaired(context: Context, host: String) = if (Demo.on) host.trim() == Demo.HOST else prefs(context).contains(key(host))
 
-    /** Forget a TV (the TV keeps its side until "Android TV Remote Service" data is cleared on it). */
-    fun forget(context: Context, host: String) = prefs(context).edit().remove(key(host)).apply()
+    /** Forget a TV, at this address and by its name (the TV keeps its side until its remote service's data is cleared). */
+    fun forget(context: Context, host: String, name: String = "") {
+        val p = prefs(context)
+        val fp = p.getString(key(host), null)
+        p.edit().apply {
+            remove(key(host))
+            if (name.isNotBlank()) remove(nameKey(name))
+            // Its other addresses too: the same TV (the same certificate).
+            if (fp != null) for ((k, v) in p.all) if (v == fp) remove(k)
+        }.apply()
+    }
+
+    /**
+     * A TV's pairing is kept by its address; this also keeps it by the TV's name (as it announces itself), so that
+     * when the router gives the TV a new address, [adopt] finds the pairing again. Call it when a paired TV is picked.
+     */
+    fun rememberName(context: Context, host: String, name: String) {
+        if (name.isBlank() || Demo.on) return
+        val fp = prefs(context).getString(key(host), null) ?: return
+        if (prefs(context).getString(nameKey(name), null) != fp) prefs(context).edit().putString(nameKey(name), fp).apply()
+    }
+
+    /**
+     * A TV found at `host` under `name`: when this phone paired with a TV of that name at another address, the
+     * pairing carries over to this one (its certificate is checked on connecting: another TV with the same name
+     * isn't trusted, it asks to pair). True when it did.
+     */
+    fun adopt(context: Context, host: String, name: String): Boolean {
+        if (name.isBlank() || Demo.on || prefs(context).contains(key(host))) return false
+        val fp = prefs(context).getString(nameKey(name), null) ?: return false
+        prefs(context).edit().putString(key(host), fp).apply()
+        return true
+    }
 
     // MARK: The remote
 
@@ -348,4 +379,5 @@ object Atv {
 
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     private fun key(host: String) = "paired:" + host.trim()
+    private fun nameKey(name: String) = "pairedName:" + name.trim().lowercase()
 }

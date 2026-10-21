@@ -235,7 +235,7 @@ fun SettingsScreen(host: String, tvName: String, onBack: () -> Unit, startOnActi
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         if (paired) {
                             OutlinedButton(onClick = {
-                                Atv.forget(context, host)
+                                Atv.forget(context, host, tvName)
                                 paired = false
                                 ActivityLog.add(context, "Forgot the pairing with $tvLabel", "Pairing")
                                 Telemetry.event(context, "forget_pairing")
