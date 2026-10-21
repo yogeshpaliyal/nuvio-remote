@@ -9,11 +9,11 @@ plugins {
 val keystoreFile = System.getenv("KEYSTORE_FILE")?.let(::file)?.takeIf { it.exists() }
 
 android {
-    namespace = "dev.nuvioremote"
+    namespace = "dev.skiff"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "dev.nuvioremote"
+        applicationId = "dev.skiff"
         minSdk = 26
         targetSdk = 36
         versionCode = System.getenv("VERSION_CODE")?.toIntOrNull() ?: 1

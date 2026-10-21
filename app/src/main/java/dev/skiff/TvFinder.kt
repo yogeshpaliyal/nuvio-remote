@@ -1,4 +1,4 @@
-package dev.nuvioremote
+package dev.skiff
 
 import android.content.Context
 import android.net.nsd.NsdManager

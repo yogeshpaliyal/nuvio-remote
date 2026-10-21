@@ -1,4 +1,4 @@
-package dev.nuvioremote
+package dev.skiff
 
 /** What to open in Nuvio on the TV: a movie, or one episode of a series. */
 data class Title(
@@ -11,8 +11,11 @@ data class Title(
     /** Nuvio's own id for the video: "tt0120737" for a movie, "tt42127457:1:4" for an episode. */
     val videoId: String get() = if (series) "$imdbId:$season:$episode" else imdbId
 
-    /** A shared page: its IMDb id, and whatever its text says about the name and type (null = not said). */
-    data class Shared(val imdbId: String, val name: String, val series: Boolean?)
+    /**
+     * A shared page: its IMDb id, and whatever its text says about the name and type (null = not said). Or, with no
+     * IMDb id, any other `link` (JioHotstar, YouTube…), with imdbId empty.
+     */
+    data class Shared(val imdbId: String, val name: String, val series: Boolean?, val link: String? = null)
 
     companion object {
         private val IMDB_ID = Regex("""\btt\d{5,}\b""")
@@ -26,11 +29,13 @@ data class Title(
          * What a share brings. Chrome sends the page's URL as the text and its title as the subject
          * ("The Lord of the Rings: The Fellowship of the Ring (2001) - IMDb"); the IMDb app puts both in the text
          * ("Agent Kim Reactivated (TV Series 2025– ) ⭐ 7.6 | Action https://m.imdb.com/title/tt42127457/").
-         * Null when there's no IMDb id in it.
+         * With no IMDb id, any other link in it; null when there's neither.
          */
         fun fromShared(text: String?, subject: String?): Shared? {
             val all = listOfNotNull(subject, text).joinToString("\n")
-            val id = idIn(all) ?: return null
+            val id = idIn(all) ?: return Links.linkIn(all)?.let { link ->
+                Shared("", subject?.lines()?.firstOrNull { it.isNotBlank() }?.trim().orEmpty(), null, link)
+            }
             val name = listOfNotNull(subject, text)
                 .flatMap { it.lines() }
                 .map { it.trim() }

@@ -1,9 +1,11 @@
-package dev.nuvioremote
+package dev.skiff
 
 import android.content.Context
 import dadb.AdbKeyPair
 import dadb.Dadb
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 
@@ -19,6 +21,8 @@ import java.io.File
 object TvLink {
     private const val PORT = 5555
     /** Nuvio's activity: forks that renamed the app (and even the scheme) usually keep the code, and this class. */
+    /** Between two answers in one shell call (not "#": query-activities prints "Activity #0:"). */
+    private const val SPLIT = "--8<--skiff--8<--"
     private const val NUVIO_CLASS = "com.nuvio.tv.MainActivity"
 
     /** A Nuvio app on the TV: `component` is what to start ("com.nuvio.app/com.nuvio.tv.MainActivity"). */
@@ -33,12 +37,20 @@ object TvLink {
         return AdbKeyPair.read(private, public)
     }
 
-    private fun connect(context: Context, host: String) = Dadb.create(host.trim(), PORT, keyPair(context))
+    /**
+     * One connection at a time: two at once, the first time, make the TV ask twice; it shows one prompt, and the other
+     * connection would wait for an answer that never comes.
+     */
+    private val lock = Mutex()
+
+    /** 5 s to reach the TV; 60 s for an answer (time to allow this phone on the TV, the first time). */
+    private fun connect(context: Context, host: String) = Dadb.create(host.trim(), PORT, keyPair(context), 5_000, 60_000)
+
+    private suspend fun <T> withTv(context: Context, host: String, block: (Dadb) -> T): T =
+        lock.withLock { withContext(Dispatchers.IO) { connect(context, host).use(block) } }
 
     /** Off the main thread. The Nuvio apps on that TV, the TV build first. Throws when the TV can't be reached. */
-    suspend fun apps(context: Context, host: String): List<NuvioApp> = withContext(Dispatchers.IO) {
-        connect(context, host).use(::detect)
-    }
+    suspend fun apps(context: Context, host: String): List<NuvioApp> = withTv(context, host, ::detect)
 
     /**
      * What Android says opens `nuvio://` (Nuvio's own scheme: every build, and forks that kept it), plus what opens
@@ -47,9 +59,9 @@ object TvLink {
      */
     private fun detect(tv: Dadb): List<NuvioApp> {
         val query = "cmd package query-activities --brief -a android.intent.action.VIEW -d"
-        val out = tv.shell("$query nuvio://open; echo '#'; $query stremio://open").output
-        val nuvio = components(out.substringBefore('#'))
-        val stremio = components(out.substringAfter('#', "")).filter { it.substringAfter('/') == NUVIO_CLASS }
+        val out = tv.shell("$query nuvio://open; echo '$SPLIT'; $query stremio://open").output
+        val nuvio = components(out.substringBefore(SPLIT))
+        val stremio = components(out.substringAfter(SPLIT, "")).filter { it.substringAfter('/') == NUVIO_CLASS }
         val byPkg = LinkedHashMap<String, String>()
         for (c in nuvio + stremio) byPkg.putIfAbsent(c.substringBefore('/'), c)
         return byPkg.map { (pkg, component) ->
@@ -62,6 +74,47 @@ object TvLink {
             )
         }.sortedBy { if (it.pkg == "com.nuvio.tv") 0 else 1 }
     }
+
+    /** A TV app that opens a link (JioHotstar, YouTube…). */
+    data class LinkApp(val pkg: String, val component: String) {
+        val name: String get() = Links.appName(pkg)
+    }
+
+    /**
+     * Off the main thread. The TV apps that open `link` (as the TV app wants it: Links.forTv), without the ones that
+     * open any web page (browsers, the Downloader app, the system's browser stub): those aren't "the app for it".
+     */
+    suspend fun linkApps(context: Context, host: String, link: String): List<LinkApp> =
+        withTv(context, host) { tv -> linkAppsOn(tv, Links.forTv(link)) }
+
+    private fun linkAppsOn(tv: Dadb, link: String): List<LinkApp> {
+        val query = "cmd package query-activities --brief -a android.intent.action.VIEW -d"
+        val out = tv.shell("$query ${q(link)}; echo '$SPLIT'; $query 'https://example.com/'").output
+        val generic = components(out.substringAfter(SPLIT, "")).toSet()
+        val apps = components(out.substringBefore(SPLIT))
+            .filter { it !in generic }
+            .distinctBy { it.substringBefore('/') }
+            .map { LinkApp(it.substringBefore('/'), it) }
+        return Rules.preferred(link, apps) { it.pkg }
+    }
+
+    /**
+     * Off the main thread. Opens `link` on the TV in `component` (null = the first app that opens it), started with its
+     * rule's flags: by default a fresh start of its screen (NEW_TASK | CLEAR_TASK), so an app already open, like
+     * JioHotstar, reads the link instead of just coming to the front.
+     */
+    suspend fun openLink(context: Context, host: String, link: String, component: String?): String =
+        withTv(context, host) { tv ->
+            val tvLink = Links.forTv(link)
+            val apps = linkAppsOn(tv, tvLink)
+            val target = apps.firstOrNull { it.component == component } ?: apps.firstOrNull()
+                ?: error("No app on the TV opens ${Links.site(link)} links.")
+            val flags = "0x" + Integer.toHexString(Rules.flags(link))
+            val r = tv.shell("am start -a android.intent.action.VIEW -d ${q(tvLink)} -n ${q(target.component)} -f $flags")
+            val out = r.allOutput.trim()
+            if (r.exitCode != 0 || out.contains("Error")) error(out.ifEmpty { "The TV said no (exit ${r.exitCode})." })
+            out
+        }
 
     /** "com.nuvio.tv/.MainActivity" → "com.nuvio.tv/com.nuvio.tv.MainActivity", from query-activities' lines. */
     private fun components(text: String): List<String> = text.lines().map { it.trim() }
@@ -96,8 +149,8 @@ object TvLink {
      * Off the main thread. Opens the title in `component` (null = the first Nuvio app found). Returns the TV's answer;
      * throws when the TV can't be reached, has no Nuvio app, or refuses.
      */
-    suspend fun open(context: Context, host: String, t: Title, component: String?): String = withContext(Dispatchers.IO) {
-        connect(context, host).use { tv ->
+    suspend fun open(context: Context, host: String, t: Title, component: String?): String =
+        withTv(context, host) { tv ->
             val apps = detect(tv)
             val target = apps.firstOrNull { it.component == component } ?: apps.firstOrNull()
                 ?: error("There's no Nuvio app on that TV.")
@@ -106,5 +159,4 @@ object TvLink {
             if (r.exitCode != 0 || out.contains("Error")) error(out.ifEmpty { "The TV said no (exit ${r.exitCode})." })
             out
         }
-    }
 }

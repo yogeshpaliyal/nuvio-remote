@@ -1,4 +1,4 @@
-package dev.nuvioremote
+package dev.skiff
 
 import android.content.Context
 import android.content.Intent
@@ -107,6 +107,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        Rules.init(this)
         shared = sharedTitle(intent)
         setContent {
             AppTheme {
@@ -179,6 +180,8 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
             }
         }
     }
+    // Newer link rules from the repo, at most once a day.
+    LaunchedEffect(Unit) { Rules.refresh(context) }
     DisposableEffect(Unit) {
         finder.start()
         onDispose { finder.stop() }
@@ -209,10 +212,21 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
     var shareRun by remember { mutableIntStateOf(0) }     // the same page shared again looks it up again
     // Movie or series set by you (the toggle, or an entry you edited): the lookup doesn't change it back.
     var keepType by remember { mutableStateOf(false) }
+    // Or any other link (JioHotstar, YouTube…): opened on the TV by the app that opens such links.
+    var link by remember { mutableStateOf<String?>(null) }
+    var linkTitle by remember { mutableStateOf("") }       // what the share called it, until the page says
+    // A link goes to history when shared, pasted or opened from it (or played): not while it's being typed.
+    var recordLink by remember { mutableStateOf(false) }
+    var page by remember { mutableStateOf<Links.Page?>(null) }
+    var linkApps by remember { mutableStateOf(emptyList<TvLink.LinkApp>()) }
+    var linkAppsLoading by remember { mutableStateOf(false) }
+    var linkComponent by remember { mutableStateOf(prefs.getString("linkApp", null)) }
+    var linkRun by remember { mutableIntStateOf(0) }     // "Check again"
 
     val hostOk = host.trim().isNotEmpty()
     val idOk = Title.isImdbId(imdbId)
-    val ready = hostOk && idOk && !busy
+    val linkOk = link != null
+    val ready = hostOk && (idOk || (linkOk && linkApps.isNotEmpty())) && !busy
     val tvLabel = tvName.ifEmpty { host.trim().ifEmpty { "the TV" } }
 
     // A TV picked: which Nuvio apps it has (connecting is also when it asks to allow this phone, the first time).
@@ -234,7 +248,30 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
         }
     }
 
+    fun openLinkOnTv() {
+        val l = link ?: return
+        busy = true
+        failed = false
+        status = "Connecting… The first time, accept “Allow USB debugging?” on the TV (tick Always allow)."
+        scope.launch {
+            try {
+                TvLink.openLink(context, host, l, linkComponent)
+                val app = (linkApps.firstOrNull { it.component == linkComponent } ?: linkApps.firstOrNull())?.name
+                val p = page ?: Links.Page(linkTitle.ifBlank { Links.site(l) })
+                library.useLink(l, p, app, played = true)
+                prefs.edit().putString("host", host.trim()).putString("tvName", tvName).putString("linkApp", linkComponent).apply()
+                status = "Opened “${p.title}”" + (app?.let { " in $it" } ?: "") + " on $tvLabel."
+            } catch (e: Exception) {
+                failed = true
+                status = "Couldn't open it: ${e.message ?: e.javaClass.simpleName}"
+            } finally {
+                busy = false
+            }
+        }
+    }
+
     fun openOnTv() {
+        if (link != null) return openLinkOnTv()
         busy = true
         failed = false
         status = "Connecting… The first time, accept “Allow USB debugging?” on the TV (tick Always allow)."
@@ -264,6 +301,19 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
     /** An entry from the library back in the remote, as it was used (or edited); `play`: straight to the TV. */
     fun pick(e: Library.Entry, play: Boolean) {
         showLibrary = false
+        if (e.link != null) {
+            link = e.link
+            linkTitle = e.name
+            recordLink = true
+            imdbId = ""
+            failed = false
+            status = null
+            // Played once the TV says which app opens it (the link effect).
+            openWhenKnown = play
+            shareRun++
+            return
+        }
+        link = null
         imdbId = e.imdbId
         name = e.name
         autoName = false
@@ -280,7 +330,18 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
     }
 
     // A shared IMDb page fills in the id (and the title, when the share says it).
-    if (shared != null) {
+    if (shared != null && shared.link != null) {
+        link = shared.link
+        linkTitle = shared.name
+        recordLink = true
+        imdbId = ""
+        status = null
+        failed = false
+        openWhenKnown = true
+        shareRun++
+        onSharedUsed()
+    } else if (shared != null) {
+        link = null
         imdbId = shared.imdbId
         if (shared.name.isNotEmpty()) {
             name = shared.name
@@ -293,6 +354,38 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
         openWhenKnown = true
         shareRun++
         onSharedUsed()
+    }
+
+    // A link: its name and picture (the page, or the link itself), and which TV apps open it; shared: opened as soon
+    // as there's an app for it.
+    LaunchedEffect(link, shareRun) {
+        page = null
+        val l = link ?: return@LaunchedEffect
+        if (!recordLink) delay(600)     // typing: wait for the whole link
+        val p = Links.page(l, linkTitle)
+        page = p
+        if (recordLink) library.useLink(l, p, null, played = false)
+    }
+    LaunchedEffect(link, host.trim(), shareRun, linkRun) {
+        linkApps = emptyList()
+        val l = link ?: return@LaunchedEffect
+        if (host.isBlank()) return@LaunchedEffect
+        delay(300)
+        linkAppsLoading = true
+        try {
+            val found = TvLink.linkApps(context, host, l)
+            linkApps = found
+            if (found.none { it.component == linkComponent }) linkComponent = found.firstOrNull()?.component
+        } catch (e: Exception) {
+            failed = true
+            status = "Couldn't reach $tvLabel: ${e.message ?: e.javaClass.simpleName}"
+        } finally {
+            linkAppsLoading = false
+        }
+        if (openWhenKnown) {
+            openWhenKnown = false
+            if (linkApps.isNotEmpty() && !busy) openLinkOnTv()
+        }
     }
 
     // The id gives the title, its art and whether it's a movie or a series (Cinemeta).
@@ -340,7 +433,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
         modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
         topBar = {
             LargeFlexibleTopAppBar(
-                title = { Text("Nuvio Remote") },
+                title = { Text("Skiff") },
                 subtitle = {
                     Text(
                         when {
@@ -365,7 +458,9 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
                 hint = when {
                     busy -> null
                     !hostOk -> "Pick a TV above"
-                    !idOk -> "Share an IMDb page, or paste its link"
+                    linkOk && linkAppsLoading -> "Checking which TV app opens it…"
+                    linkOk && linkApps.isEmpty() -> "No app on $tvLabel opens ${link?.let(Links::site)} links"
+                    !idOk && !linkOk -> "Share a page (IMDb, JioHotstar, YouTube…), or paste its link"
                     else -> null
                 },
                 onClick = { openOnTv() },
@@ -438,8 +533,45 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
                 TextButton(onClick = { manual = true }) { Text("Enter an address instead") }
             }
 
-            // MARK: Open with
-            if (hostOk) {
+            // MARK: Open with (a link: the TV apps that open it)
+            if (hostOk && linkOk) {
+                SectionHeader("Open with") {
+                    if (!linkAppsLoading) {
+                        TextButton(onClick = { linkRun++ }) {
+                            Icon(Icons.Rounded.Refresh, null, Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Check again")
+                        }
+                    }
+                }
+                when {
+                    linkAppsLoading -> Surface(
+                        shape = MaterialTheme.shapes.extraLarge,
+                        color = MaterialTheme.colorScheme.surfaceContainer,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
+                            LoadingIndicator(Modifier.size(40.dp))
+                            Spacer(Modifier.width(16.dp))
+                            Text("Checking which app on $tvLabel opens it…", style = MaterialTheme.typography.bodyLarge)
+                        }
+                    }
+                    linkApps.isEmpty() -> NoteCard(
+                        Icons.Rounded.Warning,
+                        "No app on $tvLabel opens ${link?.let(Links::site)} links. Install its TV app, then try again.",
+                        error = true,
+                    )
+                    else -> for (app in linkApps) {
+                        AppCard(
+                            app.name, app.pkg,
+                            selected = app.component == linkComponent, onClick = { linkComponent = app.component },
+                        )
+                    }
+                }
+            }
+
+            // MARK: Open with (an IMDb title: the Nuvio apps)
+            if (hostOk && !linkOk) {
                 SectionHeader("Open with") {
                     if (!appsLoading) {
                         TextButton(onClick = { appsRun++ }) {
@@ -466,7 +598,10 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
                     }
                     appsError != null -> NoteCard(Icons.Rounded.Warning, appsError!!, error = true)
                     else -> for (app in apps) {
-                        AppCard(app, selected = app.component == appComponent, onClick = { appComponent = app.component })
+                        AppCard(
+                            listOfNotNull(app.name, app.version).joinToString(" · "), "${app.source} · ${app.pkg}",
+                            selected = app.component == appComponent, onClick = { appComponent = app.component },
+                        )
                     }
                 }
             }
@@ -474,17 +609,32 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
             // MARK: What to watch
             SectionHeader("What to watch")
             OutlinedTextField(
-                value = imdbId,
-                onValueChange = { imdbId = Title.idIn(it) ?: it.trim(); keepType = false },     // a pasted IMDb link works too
-                label = { Text("IMDb link or ID") },
-                placeholder = { Text("tt0120737") },
-                supportingText = { Text("Or share an IMDb page here, from Chrome or the IMDb app") },
-                isError = imdbId.isNotEmpty() && !idOk,
+                value = link ?: imdbId,
+                onValueChange = { v ->
+                    // An IMDb link or id: the Nuvio flow; any other link: the app on the TV that opens it.
+                    val id = Title.idIn(v)
+                    when {
+                        id != null -> { link = null; imdbId = id; keepType = false }
+                        Links.isLink(v.trim()) -> { link = v.trim(); linkTitle = ""; recordLink = false; imdbId = "" }
+                        else -> { link = null; imdbId = v.trim(); keepType = false }
+                    }
+                },
+                label = { Text("Link or IMDb ID") },
+                placeholder = { Text("tt0120737, or a JioHotstar / YouTube link") },
+                supportingText = { Text("Or share a page here: IMDb, JioHotstar, YouTube…") },
+                isError = imdbId.isNotEmpty() && !idOk && !linkOk,
                 singleLine = true,
                 shape = MaterialTheme.shapes.large,
                 trailingIcon = {
                     TextButton(onClick = {
-                        clipboard.getText()?.text?.let { t -> Title.idIn(t)?.let { imdbId = it; autoName = true; keepType = false } }
+                        clipboard.getText()?.text?.let { t ->
+                            val id = Title.idIn(t)
+                            val l = Links.linkIn(t)
+                            when {
+                                id != null -> { link = null; imdbId = id; autoName = true; keepType = false }
+                                l != null -> { link = l; linkTitle = ""; recordLink = true; imdbId = "" }
+                            }
+                        }
                     }) { Text("Paste") }
                 },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
@@ -493,7 +643,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
 
             // Nothing entered: the last few used, one tap from the TV.
             val recent = entries.filter { it.inHistory }.take(3)
-            if (!idOk && recent.isNotEmpty()) {
+            if (!idOk && !linkOk && recent.isNotEmpty()) {
                 SectionHeader("Recent") {
                     TextButton(onClick = { showLibrary = true }) { Text("See all") }
                 }
@@ -504,6 +654,23 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
                         onPlay = { pick(e, true) },
                         onToggleSaved = { library.setSaved(e.title(), null, !e.saved) },
                     )
+                }
+            }
+
+            if (linkOk) {
+                val l = link!!
+                LinkCard(page, Links.site(l), loading = page == null)
+                val savedNow = entries.any { it.imdbId == l && it.saved }
+                ToggleButton(
+                    checked = savedNow,
+                    onCheckedChange = { on ->
+                        library.setLinkSaved(l, page, linkApps.firstOrNull { it.component == linkComponent }?.name, on)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(if (savedNow) AppIcons.Bookmark else AppIcons.BookmarkBorder, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (savedNow) "Saved for later" else "Save for later")
                 }
             }
 
@@ -653,10 +820,10 @@ private fun TvCard(tv: TvFinder.Tv, selected: Boolean, onClick: () -> Unit) {
     }
 }
 
-/** A Nuvio app on the TV: its build (version, where it came from); the picked one gets the cookie badge. */
+/** A TV app to open in: a Nuvio build (version, where it came from), or the app for a link; the picked one gets the cookie badge. */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun AppCard(app: TvLink.NuvioApp, selected: Boolean, onClick: () -> Unit) {
+private fun AppCard(title: String, subtitle: String, selected: Boolean, onClick: () -> Unit) {
     val container by animateColorAsState(
         if (selected) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
         label = "app",
@@ -682,17 +849,47 @@ private fun AppCard(app: TvLink.NuvioApp, selected: Boolean, onClick: () -> Unit
             }
             Spacer(Modifier.width(16.dp))
             Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Text(
-                    listOfNotNull(app.name, app.version).joinToString(" · "),
-                    style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    "${app.source} · ${app.pkg}",
+                    subtitle,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             if (selected) Icon(Icons.Rounded.Check, "Selected", tint = MaterialTheme.colorScheme.tertiary)
+        }
+    }
+}
+
+/** A link: its picture (when the page has one), its name, and the site. */
+@Composable
+private fun LinkCard(page: Links.Page?, site: String, loading: Boolean) {
+    Card(shape = MaterialTheme.shapes.extraLarge, modifier = Modifier.fillMaxWidth()) {
+        Box(Modifier.fillMaxWidth().heightIn(min = 140.dp)) {
+            val image = page?.image
+            if (image != null) {
+                AsyncImage(model = image, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.matchParentSize())
+                Box(
+                    Modifier.matchParentSize().background(
+                        Brush.horizontalGradient(listOf(Color.Black.copy(alpha = 0.85f), Color.Black.copy(alpha = 0.35f))),
+                    ),
+                )
+            }
+            val onArt = if (image != null) Color.White else MaterialTheme.colorScheme.onSurface
+            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (loading) {
+                    LoadingIndicator(Modifier.size(40.dp))
+                } else {
+                    Text(
+                        page?.title.orEmpty(), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold,
+                        color = onArt, maxLines = 3, overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Pill(site)
+                    page?.by?.let { Pill(it) }
+                }
+            }
         }
     }
 }

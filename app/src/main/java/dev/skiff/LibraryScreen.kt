@@ -1,4 +1,4 @@
-package dev.nuvioremote
+package dev.skiff
 
 import android.text.format.DateUtils
 import androidx.compose.foundation.background
@@ -134,7 +134,7 @@ fun LibraryScreen(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
-                        if (tab == 0) "Titles you share, paste or play show up here."
+                        if (tab == 0) "Titles and links you share, paste or play show up here."
                         else "Tap the bookmark on a title to watch it later.",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -215,7 +215,10 @@ fun EntryRow(
                     .background(MaterialTheme.colorScheme.secondaryContainer),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(if (e.series) AppIcons.Series else AppIcons.Movie, null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
+                Icon(
+                    when { e.link != null -> AppIcons.Tv; e.series -> AppIcons.Series; else -> AppIcons.Movie }, null,
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                )
                 if (e.poster != null) {
                     AsyncImage(model = e.poster, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.matchParentSize())
                 }
@@ -225,7 +228,11 @@ fun EntryRow(
                 Text(e.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Text(
                     listOfNotNull(
-                        if (e.series) "S${e.season} E${e.episode}" else "Movie",
+                        when {
+                            e.link != null -> e.app ?: Links.site(e.link)
+                            e.series -> "S${e.season} E${e.episode}"
+                            else -> "Movie"
+                        },
                         e.year,
                         DateUtils.getRelativeTimeSpanString(e.lastUsed, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS).toString(),
                     ).joinToString(" · "),
@@ -288,7 +295,7 @@ private fun EditDialog(e: Library.Entry, onDismiss: () -> Unit, onSave: (Library
                     value = name, onValueChange = { name = it }, label = { Text("Name shown in Nuvio") },
                     singleLine = true, shape = MaterialTheme.shapes.large, modifier = Modifier.fillMaxWidth(),
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween)) {
+                if (e.link == null) Row(horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween)) {
                     ToggleButton(
                         checked = !series, onCheckedChange = { series = false },
                         shapes = ButtonGroupDefaults.connectedLeadingButtonShapes(), modifier = Modifier.weight(1f),
@@ -298,7 +305,7 @@ private fun EditDialog(e: Library.Entry, onDismiss: () -> Unit, onSave: (Library
                         shapes = ButtonGroupDefaults.connectedTrailingButtonShapes(), modifier = Modifier.weight(1f),
                     ) { Text("Series") }
                 }
-                if (series) {
+                if (series && e.link == null) {
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         OutlinedTextField(
                             value = season, onValueChange = { season = it.filter(Char::isDigit) }, label = { Text("Season") },

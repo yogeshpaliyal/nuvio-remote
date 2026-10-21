@@ -1,4 +1,4 @@
-package dev.nuvioremote
+package dev.skiff
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async

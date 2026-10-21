@@ -32,11 +32,11 @@ jobs:
         run: |
           export VERSION_NAME="${VERSION_NAME#v}"
           ./gradlew assembleRelease
-          cp app/build/outputs/apk/release/app-release.apk "nuvio-remote-${VERSION_NAME}.apk"
+          cp app/build/outputs/apk/release/app-release.apk "skiff-${VERSION_NAME}.apk"
       - name: Check the signature
         run: |
-          "$ANDROID_HOME"/build-tools/$(ls "$ANDROID_HOME"/build-tools | sort -V | tail -1)/apksigner verify --print-certs nuvio-remote-*.apk | head -3
+          "$ANDROID_HOME"/build-tools/$(ls "$ANDROID_HOME"/build-tools | sort -V | tail -1)/apksigner verify --print-certs skiff-*.apk | head -3
       - uses: softprops/action-gh-release@v2
         with:
-          files: nuvio-remote-*.apk
+          files: skiff-*.apk
           generate_release_notes: true

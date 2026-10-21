@@ -1,4 +1,4 @@
-package dev.nuvioremote
+package dev.skiff
 
 import android.content.Context
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,6 +25,8 @@ class Library private constructor(context: Context) {
         val inHistory: Boolean = true,      // false: only saved for later (removed from history, or never used)
         val plays: Int = 0,
         val lastUsed: Long = System.currentTimeMillis(),
+        val link: String? = null,           // a link (JioHotstar, YouTube…): then imdbId is the link itself
+        val app: String? = null,            // the TV app it opened in ("JioHotstar")
     ) {
         fun title() = Title(imdbId, name, series, season, episode)
     }
@@ -48,6 +50,30 @@ class Library private constructor(context: Context) {
             lastUsed = System.currentTimeMillis(),
         )
         put(entry)
+    }
+
+    /** A link used: shared or pasted (`played` false), or opened on the TV (true). Keyed by the link. */
+    fun useLink(link: String, page: Links.Page, app: String?, played: Boolean) {
+        val old = find(link)
+        put(
+            (old ?: Entry(link, page.title, series = false, link = link)).copy(
+                name = page.title.ifBlank { old?.name.orEmpty() },
+                poster = page.image ?: old?.poster,
+                app = app ?: old?.app,
+                inHistory = true,
+                plays = (old?.plays ?: 0) + if (played) 1 else 0,
+            ),
+        )
+    }
+
+    /** A link saved for later, or not. */
+    fun setLinkSaved(link: String, page: Links.Page?, app: String?, saved: Boolean) {
+        val old = find(link)
+        put(
+            (old ?: Entry(link, page?.title ?: Links.site(link), series = false, poster = page?.image, inHistory = false, link = link, app = app))
+                .copy(saved = saved),
+            keepTime = old != null,
+        )
     }
 
     /** Saved for later, or not; a title not in the library yet comes in saved (not in history). */
@@ -104,6 +130,8 @@ class Library private constructor(context: Context) {
                 inHistory = o.optBoolean("inHistory", true),
                 plays = o.optInt("plays"),
                 lastUsed = o.optLong("lastUsed"),
+                link = o.optString("link").takeIf { it.isNotEmpty() },
+                app = o.optString("app").takeIf { it.isNotEmpty() },
             )
         }.sortedByDescending { it.lastUsed }
     }.getOrDefault(emptyList())
@@ -116,7 +144,8 @@ class Library private constructor(context: Context) {
                 JSONObject().put("imdbId", e.imdbId).put("name", e.name).put("series", e.series)
                     .put("season", e.season).put("episode", e.episode).put("poster", e.poster ?: "")
                     .put("year", e.year ?: "").put("saved", e.saved).put("inHistory", e.inHistory)
-                    .put("plays", e.plays).put("lastUsed", e.lastUsed),
+                    .put("plays", e.plays).put("lastUsed", e.lastUsed)
+                    .put("link", e.link ?: "").put("app", e.app ?: ""),
             )
         }
         val tmp = File(file.path + ".tmp")
