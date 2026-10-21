@@ -73,6 +73,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.skiff.atv.Atv
@@ -444,6 +445,14 @@ fun SettingsScreen(host: String, tvName: String, onBack: () -> Unit, startOnActi
                     }
                 }
             }
+            // The version, quietly, at the very end.
+            Text(
+                "Skiff ${appVersion(context)}",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+            )
             Spacer(Modifier.size(24.dp))
         }
     }
