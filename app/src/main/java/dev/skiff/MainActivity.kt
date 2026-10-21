@@ -97,6 +97,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import dev.skiff.atv.Atv
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -174,10 +175,12 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
     val finder = remember {
         TvFinder(context) { found ->
             tvs = found
-            val same = found.firstOrNull { it.ready && it.name == tvName }
+            // Usable: USB debugging on, or paired (the Google TV remote protocol).
+            fun usable(tv: TvFinder.Tv) = tv.ready || Atv.isPaired(context, tv.host)
+            val same = found.firstOrNull { usable(it) && it.name == tvName }
             when {
                 same != null -> host = same.host
-                host.isBlank() -> found.singleOrNull { it.ready }?.let { host = it.host; tvName = it.name }
+                host.isBlank() -> found.singleOrNull { usable(it) }?.let { host = it.host; tvName = it.name }
             }
         }
     }
@@ -227,7 +230,11 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
     val hostOk = host.trim().isNotEmpty()
     val idOk = Title.isImdbId(imdbId)
     val linkOk = link != null
-    val ready = hostOk && (idOk || (linkOk && linkApps.isNotEmpty())) && !busy
+    // Paired with this TV: links open over the remote protocol when its ADB isn't there (the TV picks the app).
+    // Checked again when the remote closes (pairing happens there).
+    val paired = remember(host.trim(), showRemote) { hostOk && Atv.isPaired(context, host) }
+    val linkByPairing = linkOk && linkApps.isEmpty() && !linkAppsLoading && paired
+    val ready = hostOk && (idOk || (linkOk && (linkApps.isNotEmpty() || linkByPairing))) && !busy
     val tvLabel = tvName.ifEmpty { host.trim().ifEmpty { "the TV" } }
 
     // A TV picked: which Nuvio apps it has (connecting is also when it asks to allow this phone, the first time).
@@ -243,7 +250,11 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
             if (found.none { it.component == appComponent }) appComponent = found.firstOrNull()?.component
             if (found.isEmpty()) appsError = "There's no Nuvio app on $tvLabel. Install it from the Play Store or GitHub."
         } catch (e: Exception) {
-            appsError = "Couldn't reach $tvLabel: ${e.message ?: e.javaClass.simpleName}"
+            appsError = if (Atv.isPaired(context, host)) {
+                "Opening titles in Nuvio needs USB debugging on $tvLabel (links and the remote work paired)."
+            } else {
+                "Couldn't reach $tvLabel: ${e.message ?: e.javaClass.simpleName}"
+            }
         } finally {
             appsLoading = false
         }
@@ -253,11 +264,12 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
         val l = link ?: return
         busy = true
         failed = false
-        status = "Connecting… The first time, accept “Allow USB debugging?” on the TV (tick Always allow)."
+        val byPairing = linkByPairing
+        status = if (byPairing) "Connecting…" else "Connecting… The first time, accept “Allow USB debugging?” on the TV (tick Always allow)."
         scope.launch {
             try {
-                TvLink.openLink(context, host, l, linkComponent)
-                val app = (linkApps.firstOrNull { it.component == linkComponent } ?: linkApps.firstOrNull())?.name
+                if (byPairing) Atv.openLink(context, host, Links.forTv(l)) else TvLink.openLink(context, host, l, linkComponent)
+                val app = if (byPairing) null else (linkApps.firstOrNull { it.component == linkComponent } ?: linkApps.firstOrNull())?.name
                 val p = page ?: Links.Page(linkTitle.ifBlank { Links.site(l) })
                 library.useLink(l, p, app, played = true)
                 prefs.edit().putString("host", host.trim()).putString("tvName", tvName).putString("linkApp", linkComponent).apply()
@@ -378,14 +390,17 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
             linkApps = found
             if (found.none { it.component == linkComponent }) linkComponent = found.firstOrNull()?.component
         } catch (e: Exception) {
-            failed = true
-            status = "Couldn't reach $tvLabel: ${e.message ?: e.javaClass.simpleName}"
+            // Paired: no USB debugging needed, the link goes over the remote protocol.
+            if (!Atv.isPaired(context, host)) {
+                failed = true
+                status = "Couldn't reach $tvLabel: ${e.message ?: e.javaClass.simpleName}"
+            }
         } finally {
             linkAppsLoading = false
         }
         if (openWhenKnown) {
             openWhenKnown = false
-            if (linkApps.isNotEmpty() && !busy) openLinkOnTv()
+            if ((linkApps.isNotEmpty() || Atv.isPaired(context, host)) && !busy) openLinkOnTv()
         }
     }
 
@@ -466,7 +481,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
                     busy -> null
                     !hostOk -> "Pick a TV above"
                     linkOk && linkAppsLoading -> "Checking which TV app opens it…"
-                    linkOk && linkApps.isEmpty() -> "No app on $tvLabel opens ${link?.let(Links::site)} links"
+                    linkOk && linkApps.isEmpty() && !paired -> "No app on $tvLabel opens ${link?.let(Links::site)} links"
                     !idOk && !linkOk -> "Share a page (IMDb, JioHotstar, YouTube…), or paste its link"
                     else -> null
                 },
@@ -513,13 +528,13 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
             for (tv in tvs) {
                 TvCard(
                     tv = tv,
-                    selected = tv.ready && tv.host == host.trim(),
+                    selected = tv.host == host.trim(),
+                    paired = Atv.isPaired(context, tv.host),
                     onClick = {
-                        if (tv.ready) {
-                            host = tv.host
-                            tvName = tv.name
-                            manual = false
-                        }
+                        // Without USB debugging too: it can be paired (the remote shows how).
+                        host = tv.host
+                        tvName = tv.name
+                        manual = false
                     },
                 )
             }
@@ -563,6 +578,11 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
                             Text("Checking which app on $tvLabel opens it…", style = MaterialTheme.typography.bodyLarge)
                         }
                     }
+                    linkApps.isEmpty() && paired -> NoteCard(
+                        Icons.Rounded.Check,
+                        "Paired with $tvLabel: it opens the link in its app for ${link?.let(Links::site)}.",
+                        error = false,
+                    )
                     linkApps.isEmpty() -> NoteCard(
                         Icons.Rounded.Warning,
                         "No app on $tvLabel opens ${link?.let(Links::site)} links. Install its TV app, then try again.",
@@ -789,7 +809,7 @@ private fun SectionHeader(text: String, action: @Composable () -> Unit = {}) {
 /** A TV: its name and address; the selected one gets the expressive cookie badge and the primary container. */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun TvCard(tv: TvFinder.Tv, selected: Boolean, onClick: () -> Unit) {
+private fun TvCard(tv: TvFinder.Tv, selected: Boolean, paired: Boolean, onClick: () -> Unit) {
     val container by animateColorAsState(
         if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
         label = "tv",
@@ -817,7 +837,11 @@ private fun TvCard(tv: TvFinder.Tv, selected: Boolean, onClick: () -> Unit) {
             Column(Modifier.weight(1f)) {
                 Text(tv.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Text(
-                    if (tv.ready) tv.host else "${tv.host} · turn on USB debugging on this TV",
+                    when {
+                        tv.ready -> tv.host
+                        paired -> "${tv.host} · paired"
+                        else -> "${tv.host} · pair it from the remote"
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

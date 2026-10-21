@@ -66,4 +66,5 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     // Talks ADB to the TV over Wi-Fi, from the phone (the same "am start" you'd run from a computer).
     implementation("dev.mobile:dadb:1.2.10")
+    testImplementation("junit:junit:4.13.2")
 }
