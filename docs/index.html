@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skiff — Send to TV</title>
+<meta name="description" content="Share a link on your phone and it opens on your Android TV or Google TV, in the right app. A remote too. No developer options needed. Free and open source.">
+<meta property="og:title" content="Skiff — Send to TV">
+<meta property="og:description" content="Share it on your phone. It opens on your TV.">
+<meta property="og:image" content="https://yogeshpaliyal.github.io/skiff/brand/social-preview.png">
+<meta property="og:url" content="https://yogeshpaliyal.github.io/skiff/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="brand/logo.svg" type="image/svg+xml">
+<style>
+  :root {
+    --violet: #6A3DF0; --teal: #0FB8A9; --sail: #FFCB47;
+    --bg: #FBFAFE; --surface: #FFFFFF; --ink: #16131F; --muted: #625C73; --line: #E9E5F2;
+    --chip: #F2EEFC; --accent: #6A3DF0;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0F0D16; --surface: #17141F; --ink: #F4EFFF; --muted: #A79FBC; --line: #26222F; --chip: #201C2B; --accent: #B49CFF;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0F0D16; --surface: #17141F; --ink: #F4EFFF; --muted: #A79FBC; --line: #26222F; --chip: #201C2B; --accent: #B49CFF;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: -apple-system, "SF Pro Text", "Inter", "Segoe UI", Roboto, sans-serif;
+    font-size: 17px; line-height: 1.55; -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+
+  /* Nav */
+  nav { display: flex; align-items: center; justify-content: space-between; padding: 22px 0; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 19px; text-decoration: none; }
+  .brand img { width: 32px; height: 32px; }
+  nav .links { display: flex; gap: 22px; font-size: 15px; }
+  nav .links a { text-decoration: none; color: var(--muted); }
+  nav .links a:hover { color: var(--ink); }
+
+  /* Hero */
+  .hero { display: grid; grid-template-columns: 1.05fr 1fr; gap: 48px; align-items: center; padding: 56px 0 88px; }
+  .eyebrow { display: inline-block; font-size: 13px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+    color: var(--accent); background: var(--chip); padding: 6px 12px; border-radius: 999px; }
+  h1 { font-size: clamp(44px, 6.4vw, 76px); line-height: 1.02; letter-spacing: -0.035em; margin: 20px 0 18px; font-weight: 800; }
+  h1 .grad { background: linear-gradient(100deg, var(--violet), var(--teal)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .lead { font-size: 19px; color: var(--muted); max-width: 30em; margin: 0 0 30px; }
+  .cta { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .btn { display: inline-flex; align-items: center; gap: 10px; padding: 14px 22px; border-radius: 999px; font-weight: 600;
+    font-size: 16px; text-decoration: none; transition: transform .15s ease, box-shadow .15s ease; }
+  .btn:hover { transform: translateY(-1px); }
+  .btn.primary { background: linear-gradient(100deg, var(--violet), #5A47E8 55%, var(--teal)); color: #fff;
+    box-shadow: 0 10px 28px -10px rgba(106, 61, 240, .65); }
+  .btn.ghost { border: 1.5px solid var(--line); background: var(--surface); }
+  .btn svg { width: 18px; height: 18px; }
+  .fine { margin-top: 16px; font-size: 14px; color: var(--muted); }
+
+  /* The picture: phone → TV */
+  .art { position: relative; aspect-ratio: 440 / 320; }
+  .art svg { width: 100%; height: 100%; overflow: visible; }
+  .boat { offset-path: path("M 128 210 C 200 70, 300 60, 372 140"); animation: sail 3.6s ease-in-out infinite; }
+  @keyframes sail { 0% { offset-distance: 0%; opacity: 0 } 12% { opacity: 1 } 80% { opacity: 1 } 100% { offset-distance: 100%; opacity: 0 } }
+  .tvglow { animation: glow 3.6s ease-in-out infinite; }
+  @keyframes glow { 0%, 70% { opacity: 0 } 85% { opacity: 1 } 100% { opacity: 0 } }
+  @media (prefers-reduced-motion: reduce) { .boat, .tvglow { animation: none; } .boat { offset-distance: 55%; } }
+
+  /* Sections */
+  section { padding: 72px 0; border-top: 1px solid var(--line); }
+  h2 { font-size: clamp(30px, 3.6vw, 40px); letter-spacing: -0.025em; line-height: 1.1; margin: 0 0 12px; }
+  .sub { color: var(--muted); margin: 0 0 40px; max-width: 34em; }
+
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; counter-reset: s; }
+  .step { padding: 26px; border-radius: 22px; background: var(--surface); border: 1px solid var(--line); }
+  .step::before { counter-increment: s; content: counter(s); display: grid; place-items: center; width: 36px; height: 36px;
+    border-radius: 12px; background: var(--chip); color: var(--accent); font-weight: 700; margin-bottom: 18px; }
+  .step h3 { margin: 0 0 6px; font-size: 19px; }
+  .step p { margin: 0; color: var(--muted); font-size: 16px; }
+
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line);
+    border-radius: 22px; overflow: hidden; }
+  .feat { background: var(--surface); padding: 28px; }
+  .feat .ic { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; margin-bottom: 16px;
+    background: linear-gradient(135deg, rgba(106,61,240,.16), rgba(15,184,169,.16)); color: var(--accent); }
+  .feat .ic svg { width: 22px; height: 22px; }
+  .feat h3 { margin: 0 0 6px; font-size: 17px; }
+  .feat p { margin: 0; color: var(--muted); font-size: 15px; }
+
+  .apps { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
+  .apps span { padding: 8px 14px; border-radius: 999px; background: var(--chip); font-size: 14px; font-weight: 500; }
+
+  .privacy { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: center; padding: 36px; border-radius: 26px;
+    background: linear-gradient(120deg, rgba(106,61,240,.10), rgba(15,184,169,.10)); border: 1px solid var(--line); }
+  .privacy h2 { font-size: 28px; }
+  .privacy p { margin: 0; color: var(--muted); }
+
+  .final { text-align: center; }
+  .final .cta { justify-content: center; }
+  .final img { width: 72px; height: 72px; margin-bottom: 18px; }
+
+  footer { padding: 36px 0 48px; color: var(--muted); font-size: 14px; display: flex; flex-wrap: wrap; gap: 8px 24px;
+    justify-content: space-between; border-top: 1px solid var(--line); }
+  footer a { color: var(--muted); }
+
+  @media (max-width: 860px) {
+    .hero { grid-template-columns: 1fr; padding-top: 24px; gap: 28px; }
+    .art { max-width: 460px; width: 100%; margin: 0 auto; }
+    .steps, .grid { grid-template-columns: 1fr; }
+    .privacy { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 520px) {
+    .wrap { padding: 0 16px; }
+    nav .links a.hide-sm { display: none; }
+    section { padding: 56px 0; }
+    .btn { width: 100%; justify-content: center; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav>
+    <a class="brand" href="#"><img src="brand/logo.svg" alt="">Skiff</a>
+    <div class="links">
+      <a class="hide-sm" href="#how">How it works</a>
+      <a class="hide-sm" href="#features">Features</a>
+      <a href="https://github.com/yogeshpaliyal/skiff">GitHub</a>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <div>
+      <span class="eyebrow">For Android TV &amp; Google TV</span>
+      <h1>Share it on your phone.<br><span class="grad">It plays on your TV.</span></h1>
+      <p class="lead">Found something to watch? Share the link to Skiff and it opens on your TV, in the right app. A remote too, with your phone's keyboard. No developer options needed.</p>
+      <div class="cta">
+        <a class="btn primary" href="https://github.com/yogeshpaliyal/skiff/releases/latest">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19.5h14"/></svg>
+          Download for Android
+        </a>
+        <a class="btn ghost" href="https://github.com/yogeshpaliyal/skiff">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.68-1.28-1.68-1.04-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.76 2.7 1.25 3.36.96.1-.75.4-1.25.73-1.54-2.55-.29-5.24-1.28-5.24-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.41-2.69 5.38-5.25 5.67.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z"/></svg>
+          Source on GitHub
+        </a>
+      </div>
+      <p class="fine">Free and open source · Android 8+ · APK from GitHub Releases</p>
+    </div>
+
+    <div class="art" aria-hidden="true">
+      <svg viewBox="20 50 440 320">
+        <defs>
+          <linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6A3DF0"/><stop offset="1" stop-color="#0FB8A9"/></linearGradient>
+          <linearGradient id="screen" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2A2142"/><stop offset="1" stop-color="#12303A"/></linearGradient>
+        </defs>
+        <!-- the way across -->
+        <path d="M 128 210 C 200 70, 300 60, 372 140" fill="none" stroke="url(#g)" stroke-width="3" stroke-dasharray="2 10" stroke-linecap="round" opacity=".7"/>
+        <!-- TV -->
+        <g transform="translate(250 120)">
+          <rect x="0" y="0" width="200" height="124" rx="14" fill="#1A1624"/>
+          <rect x="8" y="8" width="184" height="108" rx="8" fill="url(#screen)"/>
+          <rect class="tvglow" x="8" y="8" width="184" height="108" rx="8" fill="url(#g)" opacity="0"/>
+          <path d="M92 44 L92 80 L120 62 Z" fill="#FFCB47"/>
+          <rect x="70" y="132" width="60" height="6" rx="3" fill="#1A1624" opacity=".35"/>
+        </g>
+        <!-- phone -->
+        <g transform="translate(40 150)">
+          <rect x="0" y="0" width="112" height="210" rx="22" fill="#1A1624"/>
+          <rect x="7" y="7" width="98" height="196" rx="16" fill="#241F33"/>
+          <rect x="40" y="14" width="32" height="5" rx="2.5" fill="#3A3548"/>
+          <rect x="16" y="32" width="80" height="52" rx="10" fill="url(#screen)"/>
+          <rect x="16" y="92" width="58" height="7" rx="3.5" fill="#3A3548"/>
+          <rect x="16" y="106" width="40" height="7" rx="3.5" fill="#3A3548"/>
+          <rect x="12" y="136" width="88" height="56" rx="14" fill="#2F2A40"/>
+          <rect x="22" y="148" width="22" height="22" rx="7" fill="#3A3548"/>
+          <rect x="68" y="148" width="22" height="22" rx="7" fill="#3A3548"/>
+          <rect x="45" y="148" width="22" height="22" rx="7" fill="url(#g)"/>
+          <path d="M53 152 L53 164 L61 159 Z" fill="#FFCB47"/>
+        </g>
+        <!-- the skiff, sailing over -->
+        <g class="boat">
+          <g transform="translate(-14 -16)">
+            <path d="M13 0 L13 16 L25 10 Z" fill="#FFCB47"/>
+            <path d="M2 19 H28 L23 26 H7 Z" fill="currentColor" style="color: var(--ink)"/>
+          </g>
+        </g>
+      </svg>
+    </div>
+  </header>
+</div>
+
+<section id="how">
+  <div class="wrap">
+    <h2>Three taps, couch to screen.</h2>
+    <p class="sub">The first time, pair with the code your TV shows, like the Google TV app. After that it's just share.</p>
+    <div class="steps">
+      <div class="step"><h3>Share</h3><p>From YouTube, JioHotstar, IMDb or any app: Share → Skiff.</p></div>
+      <div class="step"><h3>Pick your TV</h3><p>Skiff finds the TVs on your Wi-Fi by name. No address to type.</p></div>
+      <div class="step"><h3>Play</h3><p>It opens on the TV, in the app that plays it. IMDb titles open in Nuvio.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="features">
+  <div class="wrap">
+    <h2>Small app. Does the job.</h2>
+    <p class="sub">Everything happens between your phone and your TV, on your Wi-Fi.</p>
+    <div class="grid">
+      <div class="feat">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 11V7a4 4 0 1 1 8 0v4"/><rect x="5" y="11" width="14" height="10" rx="2.5"/></svg></div>
+        <h3>No developer options</h3><p>Pair once with a code on the TV. USB debugging is optional, for extras.</p>
+      </div>
+      <div class="feat">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="7" y="2" width="10" height="20" rx="3"/><circle cx="12" cy="9" r="2.5"/><path d="M10 15h4M10 18h4"/></svg></div>
+        <h3>A real remote</h3><p>D-pad, volume, playback, power. Your phone's volume buttons work too.</p>
+      </div>
+      <div class="feat">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="6" width="20" height="13" rx="2.5"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 15h10"/></svg></div>
+        <h3>Type on the TV</h3><p>Search with your phone's keyboard instead of the on-screen one.</p>
+      </div>
+      <div class="feat">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1"/><path d="M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1"/></svg></div>
+        <h3>The right app</h3><p>Links open in the TV's own app for them, with rules that improve without updates.</p>
+      </div>
+      <div class="feat">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v5l3 2"/><circle cx="12" cy="12" r="9"/></svg></div>
+        <h3>History &amp; Saved</h3><p>Everything you sent, and a list for later. Kept on your phone.</p>
+      </div>
+      <div class="feat">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="8" height="8" rx="2.5"/><rect x="13" y="3" width="8" height="8" rx="2.5"/><rect x="3" y="13" width="8" height="8" rx="2.5"/><path d="M17 13v8M13 17h8"/></svg></div>
+        <h3>Quick Settings tile</h3><p>The remote, one swipe away from anywhere on your phone.</p>
+      </div>
+    </div>
+    <div class="apps">
+      <span>YouTube</span><span>JioHotstar</span><span>IMDb → Nuvio</span><span>Any app the TV can open</span>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="privacy">
+      <div>
+        <h2>No account. No ads.</h2>
+        <p>History stays on your phone. Skiff sends crash reports and anonymous usage, never what you watch, and one switch turns that off.</p>
+      </div>
+      <a class="btn ghost" href="https://github.com/yogeshpaliyal/skiff/blob/main/PRIVACY.md">Privacy policy</a>
+    </div>
+  </div>
+</section>
+
+<section class="final">
+  <div class="wrap">
+    <img src="brand/logo.svg" alt="">
+    <h2>Send it to the TV.</h2>
+    <p class="sub" style="margin: 0 auto 28px">Free, open source, and made for Android TV and Google TV.</p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/yogeshpaliyal/skiff/releases/latest">Download for Android</a>
+    </div>
+  </div>
+</section>
+
+<div class="wrap">
+  <footer>
+    <span>Skiff · Not affiliated with Nuvio, Google or any streaming service.</span>
+    <span><a href="https://github.com/yogeshpaliyal/skiff">GitHub</a> · <a href="https://github.com/yogeshpaliyal/skiff/blob/main/PRIVACY.md">Privacy</a> · <a href="https://github.com/yogeshpaliyal/skiff/issues">Feedback</a></span>
+  </footer>
+</div>
+</body>
+</html>
