@@ -42,7 +42,6 @@ import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Warning
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
@@ -80,7 +79,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.text.input.KeyboardCapitalization
 import dev.skiff.atv.Atv
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -99,19 +97,15 @@ fun RemoteScreen(host: String, tvName: String, onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     var remote by remember { mutableStateOf<TvKeys?>(null) }
     var via by remember { mutableStateOf("") }        // "paired" (Google TV remote protocol) or "USB debugging"
-    // Pairing (no developer options): the TV shows a code, typed here.
-    var pairing by remember { mutableStateOf<Atv.Pairing?>(null) }
-    var pairBusy by remember { mutableStateOf(false) }
-    var pairNote by remember { mutableStateOf<String?>(null) }
-    var code by remember { mutableStateOf("") }
+    val mode = remember(host) { Connection.remote(context, host) }
     var error by remember { mutableStateOf<String?>(null) }
     var attempt by remember { mutableIntStateOf(0) }
     var typing by remember { mutableStateOf(false) }
     var typed by remember { mutableStateOf("") }
     val ready = remote != null
 
-    // Connected while the remote is showing: paired (the Google TV remote protocol) first, else the TV's ADB (USB
-    // debugging; the first time, the TV asks to allow this phone), else: pair.
+    // Connected while the remote is showing, as Settings says: Automatic is paired (the Google TV remote protocol)
+    // first, else the TV's ADB (USB debugging; the first time, the TV asks to allow this phone), else: pair.
     LaunchedEffect(host, attempt) {
         error = null
         remote?.close()
@@ -121,62 +115,32 @@ fun RemoteScreen(host: String, tvName: String, onBack: () -> Unit) {
             return@LaunchedEffect
         }
         var pairedFailed: String? = null
-        if (Atv.isPaired(context, host)) {
+        if (mode != Connection.Via.ADB && Atv.isPaired(context, host)) {
             try {
                 remote = Atv.connect(context, host)
-                via = "paired"
+                via = "Pairing"
+                ActivityLog.add(context, "Remote connected", via)
                 return@LaunchedEffect
             } catch (e: Exception) {
                 pairedFailed = e.message
             }
         }
+        if (mode == Connection.Via.PAIRING) {
+            error = pairedFailed ?: "Pair with ${tvName.ifEmpty { "the TV" }} to use the remote (Settings: Pairing only)."
+            return@LaunchedEffect
+        }
         try {
             remote = TvLink.remote(context, host)
             via = "USB debugging"
+            ActivityLog.add(context, "Remote connected", via)
         } catch (e: Exception) {
-            error = pairedFailed ?: "Pair with ${tvName.ifEmpty { "the TV" }} to use the remote: no USB debugging needed."
-        }
-    }
-    DisposableEffect(Unit) { onDispose { remote?.close(); pairing?.close() } }
-
-    fun startPairing() {
-        pairBusy = true
-        pairNote = null
-        scope.launch {
-            try {
-                pairing?.close()
-                pairing = Atv.pair(context, host)
-                code = ""
-            } catch (e: Exception) {
-                pairNote = "Couldn't start pairing: ${e.message ?: e.javaClass.simpleName}"
-            } finally {
-                pairBusy = false
+            error = when {
+                mode == Connection.Via.ADB -> "Couldn't reach ${tvName.ifEmpty { "the TV" }} over USB debugging: ${e.message ?: e.javaClass.simpleName}"
+                else -> pairedFailed ?: "Pair with ${tvName.ifEmpty { "the TV" }} to use the remote: no USB debugging needed."
             }
         }
     }
-
-    fun finishPairing() {
-        val p = pairing ?: return
-        pairBusy = true
-        scope.launch {
-            try {
-                when (p.finish(code)) {
-                    Atv.Pairing.Result.PAIRED -> {
-                        pairing = null
-                        pairNote = null
-                        attempt++       // connect, paired
-                    }
-                    Atv.Pairing.Result.MISTYPED -> pairNote = "That code doesn't match: check it on the TV."
-                    Atv.Pairing.Result.REFUSED -> {
-                        pairing = null
-                        pairNote = "The TV didn't accept it. Pair again."
-                    }
-                }
-            } finally {
-                pairBusy = false
-            }
-        }
-    }
+    DisposableEffect(Unit) { onDispose { remote?.close() } }
 
     /** A key now. A dropped connection reconnects (that key is lost: press again). */
     fun press(code: Int) {
@@ -185,7 +149,9 @@ fun RemoteScreen(host: String, tvName: String, onBack: () -> Unit) {
         scope.launch {
             try {
                 r.key(code)
+                ActivityLog.add(context, "Key " + KeyEvent.keyCodeToString(code).removePrefix("KEYCODE_"), via)
             } catch (e: Exception) {
+                ActivityLog.add(context, "Key " + KeyEvent.keyCodeToString(code).removePrefix("KEYCODE_"), via, ok = false)
                 remote?.close()
                 remote = null
                 attempt++
@@ -198,7 +164,11 @@ fun RemoteScreen(host: String, tvName: String, onBack: () -> Unit) {
         val r = remote ?: return
         if (t.isEmpty()) return
         view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
-        scope.launch { runCatching { r.text(t) }.onSuccess { typed = "" } }
+        scope.launch {
+            runCatching { r.text(t) }
+                .onSuccess { typed = ""; ActivityLog.add(context, "Typed “$t”", via) }
+                .onFailure { ActivityLog.add(context, "Typed “$t”", via, ok = false) }
+        }
     }
 
     Scaffold(
@@ -269,40 +239,9 @@ fun RemoteScreen(host: String, tvName: String, onBack: () -> Unit) {
                 }
             }
 
-            // Pairing: when there's no connection, or to stop needing USB debugging.
-            if (error != null || via == "USB debugging" || pairing != null) {
-                Surface(shape = MaterialTheme.shapes.extraLarge, color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text("Pair with this TV", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                        Text(
-                            if (pairing == null) "Like the Google TV app: the TV shows a code, you type it here. No developer options or USB debugging."
-                            else "Type the code shown on the TV.",
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                        if (pairing != null) {
-                            OutlinedTextField(
-                                value = code,
-                                onValueChange = { v -> code = v.uppercase().filter { it in "0123456789ABCDEF" }.take(6) },
-                                label = { Text("Code on the TV") },
-                                singleLine = true,
-                                shape = MaterialTheme.shapes.large,
-                                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters, imeAction = ImeAction.Done),
-                                keyboardActions = KeyboardActions(onDone = { if (code.length == 6) finishPairing() }),
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                        }
-                        pairNote?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error) }
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            if (pairing == null) {
-                                Button(onClick = { startPairing() }, enabled = !pairBusy && host.isNotBlank()) { Text("Show a code on the TV") }
-                            } else {
-                                Button(onClick = { finishPairing() }, enabled = !pairBusy && code.length == 6) { Text("Pair") }
-                                TextButton(onClick = { pairing?.close(); pairing = null }) { Text("Cancel") }
-                            }
-                            if (pairBusy) LoadingIndicator(Modifier.size(28.dp))
-                        }
-                    }
-                }
+            // Pairing: when there's no connection, or to stop needing USB debugging (not when Settings says USB debugging).
+            if (mode != Connection.Via.ADB && (error != null || via == "USB debugging")) {
+                PairCard(host, onPaired = { attempt++ })
             }
 
             // 1. The D-pad: the hero.

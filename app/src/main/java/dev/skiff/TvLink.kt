@@ -44,10 +44,23 @@ object TvLink {
     private val lock = Mutex()
 
     /** 5 s to reach the TV; 60 s for an answer (time to allow this phone on the TV, the first time). */
-    private fun connect(context: Context, host: String) = Dadb.create(host.trim(), PORT, keyPair(context), 5_000, 60_000)
+    private fun connect(context: Context, host: String, answer: Int = 60_000) =
+        Dadb.create(host.trim(), PORT, keyPair(context), 5_000, answer)
 
     private suspend fun <T> withTv(context: Context, host: String, block: (Dadb) -> T): T =
         lock.withLock { withContext(Dispatchers.IO) { connect(context, host).use(block) } }
+
+    /** Off the main thread. A shell command on the TV, as `adb shell` runs it (Settings → ADB tools). */
+    suspend fun shell(context: Context, host: String, command: String): dadb.AdbShellResponse =
+        withTv(context, host) { it.shell(command) }
+
+    /**
+     * Off the main thread. Installs an APK on the TV (as `adb install -r`; up to 5 minutes for the TV to answer: big
+     * apps take a while). Throws with the TV's reason when it refuses (a different signature, too old an Android…).
+     */
+    suspend fun install(context: Context, host: String, apk: File) = lock.withLock {
+        withContext(Dispatchers.IO) { connect(context, host, answer = 300_000).use { it.install(apk, "-r") } }
+    }
 
     /** Off the main thread. The Nuvio apps on that TV, the TV build first. Throws when the TV can't be reached. */
     suspend fun apps(context: Context, host: String): List<NuvioApp> = withTv(context, host, ::detect)

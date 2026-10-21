@@ -38,6 +38,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -159,6 +160,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
     val entries by library.entries.collectAsState()
     var showLibrary by remember { mutableStateOf(false) }
     var showRemote by remember { mutableStateOf(false) }
+    var showSettings by remember { mutableStateOf(false) }
     @Suppress("DEPRECATION") val clipboard = LocalClipboardManager.current
 
     // The TV
@@ -235,11 +237,15 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
     val linkOk = link != null
     // Paired with this TV: links open over the remote protocol, not ADB (the TV picks the app). Checked again when
     // the remote closes (pairing happens there).
-    val paired = remember(host.trim(), showRemote) { hostOk && Atv.isPaired(context, host) }
-    // How links open on a paired TV: pairing (the default; the TV picks the app), or USB debugging (you pick the
-    // app, and the link's rules apply), when the TV has it on.
-    var linkViaAdb by remember { mutableStateOf(prefs.getBoolean("linkViaAdb", false)) }
-    val linkByPairing = linkOk && paired && !linkViaAdb
+    val paired = remember(host.trim(), showRemote, showSettings) { hostOk && Atv.isPaired(context, host) }
+    // How links open, per TV (Settings, or the switch under Open with): Automatic is pairing when paired (the TV picks
+    // the app), else USB debugging (you pick the app, and the link's rules apply).
+    var linkVia by remember(host.trim(), showSettings) { mutableStateOf(Connection.link(context, host)) }
+    val linkByPairing = linkOk && when (linkVia) {
+        Connection.Via.AUTO -> paired
+        Connection.Via.PAIRING -> true
+        Connection.Via.ADB -> false
+    }
     val ready = hostOk && (idOk || (linkOk && (linkApps.isNotEmpty() || linkByPairing))) && !busy
     val tvLabel = tvName.ifEmpty { host.trim().ifEmpty { "the TV" } }
 
@@ -280,7 +286,9 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
                 library.useLink(l, p, app, played = true)
                 prefs.edit().putString("host", host.trim()).putString("tvName", tvName).putString("linkApp", linkComponent).apply()
                 status = "Opened “${p.title}”" + (app?.let { " in $it" } ?: "") + " on $tvLabel."
+                ActivityLog.add(context, "Link ${Links.site(l)}" + (app?.let { " → $it" } ?: ""), if (byPairing) "Pairing" else "USB debugging")
             } catch (e: Exception) {
+                ActivityLog.add(context, "Link ${Links.site(l)}", if (byPairing) "Pairing" else "USB debugging", ok = false)
                 failed = true
                 status = "Couldn't open it: ${e.message ?: e.javaClass.simpleName}"
             } finally {
@@ -308,7 +316,9 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
                 library.use(title, meta, played = true)
                 prefs.edit().putString("host", host.trim()).putString("tvName", tvName).putString("app", appComponent).apply()
                 status = "Playing “${title.name}”" + (if (series) " S$season E$episode" else "") + " on $tvLabel."
+                ActivityLog.add(context, "Nuvio “${title.name}”", "USB debugging")
             } catch (e: Exception) {
+                ActivityLog.add(context, "Nuvio “${name.trim().ifEmpty { imdbId }}”", "USB debugging", ok = false)
                 failed = true
                 status = "Couldn't open it: ${e.message ?: e.javaClass.simpleName}"
             } finally {
@@ -449,15 +459,19 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
         }
     }
 
-    BackHandler(enabled = showLibrary || showRemote) { showLibrary = false; showRemote = false }
+    BackHandler(enabled = showLibrary || showRemote || showSettings) { showLibrary = false; showRemote = false; showSettings = false }
     // 0: send, 1: library, 2: remote
-    AnimatedContent(targetState = if (showLibrary) 1 else if (showRemote) 2 else 0, label = "screen") { screen ->
+    AnimatedContent(targetState = if (showLibrary) 1 else if (showRemote) 2 else if (showSettings) 3 else 0, label = "screen") { screen ->
     if (screen == 1) {
         LibraryScreen(library, onBack = { showLibrary = false }, onOpen = { pick(it, false) }, onPlay = { pick(it, true) })
         return@AnimatedContent
     }
     if (screen == 2) {
         RemoteScreen(host.trim(), tvName, onBack = { showRemote = false })
+        return@AnimatedContent
+    }
+    if (screen == 3) {
+        SettingsScreen(host.trim(), tvName, onBack = { showSettings = false })
         return@AnimatedContent
     }
     val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
@@ -479,6 +493,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
                 actions = {
                     IconButton(onClick = { showRemote = true }, enabled = hostOk) { Icon(AppIcons.Remote, "Remote") }
                     IconButton(onClick = { showLibrary = true }) { Icon(AppIcons.History, "History and saved") }
+                    IconButton(onClick = { showSettings = true }) { Icon(Icons.Rounded.Settings, "Settings") }
                 },
                 scrollBehavior = scroll,
             )
@@ -582,10 +597,10 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
                     SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                         listOf("Pairing" to false, "USB debugging" to true).forEachIndexed { i, (label, adb) ->
                             SegmentedButton(
-                                selected = linkViaAdb == adb,
+                                selected = linkByPairing != adb,
                                 onClick = {
-                                    linkViaAdb = adb
-                                    prefs.edit().putBoolean("linkViaAdb", adb).apply()
+                                    linkVia = if (adb) Connection.Via.ADB else Connection.Via.PAIRING
+                                    Connection.setLink(context, host, linkVia)
                                 },
                                 shape = SegmentedButtonDefaults.itemShape(i, 2),
                             ) { Text(label) }
