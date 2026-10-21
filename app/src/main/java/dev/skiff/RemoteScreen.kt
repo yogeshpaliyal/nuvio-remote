@@ -57,6 +57,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -82,6 +83,7 @@ import androidx.compose.ui.unit.dp
 import dev.skiff.atv.Atv
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
 /**
@@ -171,6 +173,24 @@ fun RemoteScreen(host: String, tvName: String, onBack: () -> Unit) {
                 attempt++
             }
         }
+    }
+
+    // Over pairing with a field focused on the TV, the phone's field mirrors it: what's there shows up, and every
+    // change (deleting too) replaces the TV's text, a moment after you stop typing. Otherwise: Send types it in.
+    val noField = remember { MutableStateFlow<String?>(null) }
+    val tvField by (remote?.field ?: noField).collectAsState()
+    val live = tvField != null
+    var editedAt by remember { mutableStateOf(0L) }
+    LaunchedEffect(tvField) {
+        // The TV's text, when you aren't mid-typing (an echo of an older edit mustn't undo newer letters).
+        val t = tvField ?: return@LaunchedEffect
+        if (System.currentTimeMillis() - editedAt > 1_500 && t != typed) typed = t
+    }
+    LaunchedEffect(typed, live) {
+        val r = remote ?: return@LaunchedEffect
+        if (!live || typed == tvField) return@LaunchedEffect
+        delay(150)
+        runCatching { r.text(typed) }
     }
 
     fun type() {
@@ -305,15 +325,18 @@ fun RemoteScreen(host: String, tvName: String, onBack: () -> Unit) {
             AnimatedVisibility(typing, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
                 OutlinedTextField(
                     value = typed,
-                    onValueChange = { typed = it },
+                    onValueChange = { typed = it; editedAt = System.currentTimeMillis() },
                     label = { Text("Type on the TV") },
                     placeholder = { Text("Select a search box on the TV first") },
+                    supportingText = if (live) { { Text("Synced with the TV's search box as you type") } } else null,
                     leadingIcon = { Icon(AppIcons.Keyboard, null) },
-                    trailingIcon = { TextButton(onClick = { type() }, enabled = ready && typed.isNotEmpty()) { Text("Send") } },
+                    trailingIcon = {
+                        if (!live) TextButton(onClick = { type() }, enabled = ready && typed.isNotEmpty()) { Text("Send") }
+                    },
                     singleLine = true,
                     shape = MaterialTheme.shapes.extraLarge,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                    keyboardActions = KeyboardActions(onSend = { type() }),
+                    keyboardOptions = KeyboardOptions(imeAction = if (live) ImeAction.Done else ImeAction.Send),
+                    keyboardActions = KeyboardActions(onSend = { type() }, onDone = { typing = false }),
                     modifier = Modifier.fillMaxWidth(),
                 )
             }

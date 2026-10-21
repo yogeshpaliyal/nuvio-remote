@@ -20,6 +20,8 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.flow.first
 import java.math.BigInteger
 import java.net.InetSocketAddress
 import java.security.KeyPairGenerator
@@ -126,6 +128,8 @@ object Atv {
         // The counters of the focused field as the TV's key inject (20) gives them: app_info.counter, counter_field.
         @Volatile private var focusIme: Int? = null
         @Volatile private var focusField: Int? = null
+        private val fieldText = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+        override val field: kotlinx.coroutines.flow.StateFlow<String?> = fieldText
         @Volatile private var features = Messages.FEATURES
         @Volatile var closed = false
             private set
@@ -150,11 +154,13 @@ object Atv {
                                 imeCounter = m.imeBatchEdit.int(1)
                                 fieldCounter = m.imeBatchEdit.int(2)
                                 imeReady = true
+                                fieldText.value = m.imeFieldText ?: fieldText.value ?: ""
                             }
                             m.imeFieldCounter != null -> {
                                 focusField = m.imeFieldCounter
                                 m.imeAppCounter?.let { focusIme = it }
                                 imeReady = true
+                                fieldText.value = m.imeFieldText ?: ""
                             }
                             m.start != null -> started.complete(Unit)
                         }
@@ -177,17 +183,10 @@ object Atv {
          * letter keys there. Otherwise as key presses (Shift held for capitals and symbols).
          */
         override suspend fun text(s: String) {
-            if (s.isEmpty()) return
+            if (s.isEmpty() && !imeReady) return
             val events = KeyCharacterMap.load(KeyCharacterMap.VIRTUAL_KEYBOARD).getEvents(s.toCharArray())
             if (imeReady || events == null) {
-                // The edit replaces the field's text, so sending it with each pair of counters the TV gave is safe:
-                // the one it takes types it once. Those of the focused field (20) first, then the batch edit's (21).
-                val pairs = listOfNotNull(
-                    focusIme?.let { ime -> focusField?.let { ime to it } },
-                    imeCounter to fieldCounter,
-                ).distinct()
-                Log.d("Skiff", "Text as an IME edit with counters $pairs")
-                for ((ime, field) in pairs) send(Messages.imeText(ime, field, s))
+                edit(s)
                 return
             }
             Log.d("Skiff", "Text as key presses (no IME counters from the TV yet)")
@@ -199,6 +198,48 @@ object Atv {
                     ))
                     e.action == KeyEvent.ACTION_DOWN -> send(Messages.keyInject(e.keyCode))
                 }
+            }
+        }
+
+        /** The pairs of counters to send an edit with: the focused field's (20/22) first, then the batch edit's (21). */
+        private fun counterPairs() = listOfNotNull(
+            focusIme?.let { ime -> focusField?.let { ime to it } },
+            imeCounter to fieldCounter,
+        ).distinct()
+
+        private suspend fun sendEdit(text: String, insert: Int = 1) {
+            for ((ime, field) in counterPairs()) send(Messages.imeText(ime, field, text, insert))
+        }
+
+        /** Waits (a little) for the TV to say its field reads `text`: it answers each edit it takes. */
+        private suspend fun tvShows(text: String) =
+            withTimeoutOrNull(700) { fieldText.first { it == text } } != null
+
+        /**
+         * Makes the TV's field read `target`. The TV takes an edit when the text grows (what's typed is added), but
+         * not when it shrinks: then the same edit with insert off is tried, and if the field still reads the old
+         * text, Delete is pressed for what has to go, and the rest is added. Each step checks the TV's answer, so
+         * nothing is deleted twice.
+         */
+        private suspend fun edit(target: String) {
+            val now = fieldText.value ?: ""
+            if (target == now) return
+            if (target.startsWith(now)) {
+                Log.d("Skiff", "Edit: add (counters ${counterPairs()})")
+                sendEdit(target)
+                return
+            }
+            Log.d("Skiff", "Edit: shrink ${now.length} → ${target.length}, insert off first")
+            sendEdit(target, insert = 0)
+            if (tvShows(target)) return
+            val keep = now.commonPrefixWith(target).length
+            val current = fieldText.value ?: now
+            val deletes = current.length - keep
+            Log.d("Skiff", "Edit: not taken; Delete ×$deletes, then add ${target.length - keep}")
+            repeat(deletes) { send(Messages.keyInject(KeyEvent.KEYCODE_DEL)) }
+            if (target.length > keep) {
+                tvShows(target.substring(0, keep))
+                sendEdit(target)
             }
         }
 

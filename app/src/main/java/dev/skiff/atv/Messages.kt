@@ -119,12 +119,13 @@ object Messages {
     fun appLink(link: String) = ProtoWriter().message(90) { string(1, link) }.toByteArray()
 
     /** Text into the TV's focused field, by its input method (it sent its counters when the field got focus). */
-    fun imeText(imeCounter: Int, fieldCounter: Int, text: String) = ProtoWriter().message(21) {
+    fun imeText(imeCounter: Int, fieldCounter: Int, text: String, insert: Int = 1) = ProtoWriter().message(21) {
         varint(1, imeCounter)
         varint(2, fieldCounter)
         message(3) {
-            varint(1, 1)    // insert
-            message(2) { varint(1, text.length - 1); varint(2, text.length - 1); string(3, text) }
+            varint(1, insert)    // 1: insert (the TV takes it when the text grows)
+            // The cursor as androidtvremote2 puts it: on the last character (on none for an empty field).
+            message(2) { varint(1, maxOf(text.length - 1, 0)); varint(2, maxOf(text.length - 1, 0)); string(3, text) }
         }
     }.toByteArray()
 
@@ -138,6 +139,12 @@ object Messages {
         val imeBatchEdit = r.message(21)
         /** The focused text field's counter, as the TV announces it (key inject 20, show request 22). */
         val imeFieldCounter: Int? = (r.message(20) ?: r.message(22))?.message(2)?.takeIf { it.has(1) }?.int(1)
+        /**
+         * The focused field's text: text_field_status.value of a key inject (20) or show request (22), or the value
+         * of a batch edit's (21) text field status (its first edit).
+         */
+        val imeFieldText: String? = (r.message(20) ?: r.message(22))?.message(2)?.takeIf { it.has(2) }?.string(2)
+            ?: r.message(21)?.message(3)?.message(2)?.takeIf { it.has(3) }?.string(3)
         /** The input method's counter for the focused field: app_info.counter of the TV's key inject (20). */
         val imeAppCounter: Int? = r.message(20)?.message(1)?.takeIf { it.has(1) }?.int(1)
         val start = r.message(40)
