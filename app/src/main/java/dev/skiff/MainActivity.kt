@@ -105,6 +105,12 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
     /** The last IMDb page shared to us, read by the screen (null = nothing new). */
     private var shared by mutableStateOf<Title.Shared?>(null)
+    /** Opened from the Quick Settings tile: straight to the remote. */
+    private var openRemote by mutableStateOf(false)
+
+    companion object {
+        const val EXTRA_OPEN_REMOTE = "open_remote"
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -113,9 +119,10 @@ class MainActivity : ComponentActivity() {
         if (intent.getBooleanExtra("test_crash", false)) Telemetry.testCrash(this)
         Rules.init(this)
         shared = sharedTitle(intent)
+        openRemote = intent.getBooleanExtra(EXTRA_OPEN_REMOTE, false)
         setContent {
             AppTheme {
-                RemoteScreen(shared, onSharedUsed = { shared = null })
+                RemoteScreen(shared, onSharedUsed = { shared = null }, openRemote = openRemote, onOpenRemoteUsed = { openRemote = false })
             }
         }
     }
@@ -123,7 +130,12 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         sharedTitle(intent)?.let { shared = it }
+        if (intent.getBooleanExtra(EXTRA_OPEN_REMOTE, false)) openRemote = true
     }
+
+    /** The volume buttons go to the TV while the remote is connected (HardwareKeys). */
+    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean =
+        HardwareKeys.dispatch(event) || super.dispatchKeyEvent(event)
 
     /** Chrome shares the page's URL as the text and its title as the subject; the IMDb app, both in the text. */
     private fun sharedTitle(intent: Intent?): Title.Shared? =
@@ -150,7 +162,7 @@ private const val PREFS = "remote"
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
+private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openRemote: Boolean, onOpenRemoteUsed: () -> Unit) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences(PREFS, Context.MODE_PRIVATE) }
     val scope = rememberCoroutineScope()
@@ -483,6 +495,13 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
 
     LaunchedEffect(showLibrary, showRemote, showSettings) {
         Telemetry.screen(context, when { showLibrary -> "library"; showRemote -> "remote"; showSettings -> "settings"; else -> "send" })
+    }
+    LaunchedEffect(openRemote) {
+        if (!openRemote) return@LaunchedEffect
+        showLibrary = false
+        showSettings = false
+        showRemote = true
+        onOpenRemoteUsed()
     }
     BackHandler(enabled = showLibrary || showRemote || showSettings) { showLibrary = false; showRemote = false; showSettings = false }
     // 0: send, 1: library, 2: remote

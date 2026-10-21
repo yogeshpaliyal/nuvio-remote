@@ -4,10 +4,13 @@
 
 Send what you found on your phone to your Android TV / Google TV: share a page to Skiff, and it opens on the TV.
 
-- **An IMDb page** (from Chrome or the IMDb app) opens in [Nuvio](https://github.com/NuvioMedia/NuvioTV), on that
-  title's stream picker. Movies open right away; for a series, pick the season and episode, then **Play**.
+- **An IMDb page** (from Chrome or the IMDb app) opens in [Nuvio](https://github.com/NuvioMedia/NuvioTV): on that
+  title's stream picker over USB debugging (for a series, pick the season and episode, then **Play**), or on its page
+  when paired.
 - **Any other link** (JioHotstar, YouTube…) opens in the TV app that opens such links, when the TV has one. How each
   kind of link opens is set by [link rules](RULES.md): a fix there reaches the app without a new release.
+
+No developer options needed: pair once with the code the TV shows, like the Google TV app.
 
 Not affiliated with Nuvio or any streaming service.
 
@@ -15,16 +18,34 @@ Not affiliated with Nuvio or any streaming service.
 
 ## Remote
 
-The remote icon opens a remote for the TV: a D-pad with OK, Home, Back and Menu, a volume rocker, playback, power,
-and **Type on the TV** (text straight into the TV's search box, instead of its on-screen keyboard). Arrows, volume and
-seek repeat when held. One connection stays open while it's showing, and keys go in order (`cmd input keyevent`,
-about 100 ms each).
+The remote button, beside **Play**, opens a remote for the TV: a D-pad with OK, Home, Back and Menu, a volume rocker,
+playback, power, and **Type on the TV** (text straight into the TV's search box, instead of its on-screen keyboard).
+Arrows, volume and seek repeat when held, and the phone's own volume buttons turn the TV's volume while it's open. A
+**Quick Settings tile** (Skiff remote) opens it from anywhere.
 
 ## History and Saved for later
 
 Every title and link you share, paste or play goes to **History** (newest first, with its episode and when), and the bookmark
 saves one **for later**. Tap one to load it, ▶ to play it on the TV; ⋮ edits it (name, movie or series, episode) or
 removes it, and so does a swipe, with Undo. Kept on the phone (`files/library.json`).
+
+## Two ways to reach the TV
+
+| | Pairing | USB debugging |
+|---|---|---|
+| Setup on the TV | None: type the code it shows, once | Developer options → USB debugging, then allow the phone |
+| Remote and typing | Yes | Yes |
+| Shared links | Yes; the TV picks the app | Yes; you pick the app under **Open with** |
+| IMDb titles in Nuvio | Opens the title's page | Straight to the stream picker, with the episode |
+| ADB tools (Settings) | No | Run a command, install an APK |
+
+Skiff uses USB debugging when the TV allows this phone, else pairing. Settings → Connection can fix either one per TV,
+and Settings → Activity shows how each thing was sent.
+
+**Pairing** is the Android TV Remote protocol (v2), the one the Google TV app speaks: pairing on port 6467 with a
+6-character code, then keys, text and app links over TLS on 6466. The phone's certificate is made once in the Android
+Keystore; the TV's is pinned at pairing ([atv/](app/src/main/java/dev/skiff/atv), after
+[androidtvremote2](https://github.com/tronikos/androidtvremote2)).
 
 ## How it works
 
@@ -37,7 +58,9 @@ removes it, and so does a swipe, with Undo. Kept on the phone (`files/library.js
 - **The title.** The IMDb id (from the shared link, or typed) gives the name and whether it's a movie or a series,
   through [Cinemeta](https://v3-cinemeta.strem.io), the free catalog Stremio and Nuvio use
   ([Meta.kt](app/src/main/java/dev/skiff/Meta.kt)).
-- **Opening it.** Nuvio has no link for a title, but it opens one from these intent extras (the ones it writes to its
+- **Opening it, paired.** Nuvio's own link, `nuvio://movie/tt…` or `nuvio://series/tt…`, sent as an app link: the
+  title's page.
+- **Opening it, over USB debugging.** Straight to the streams, from these intent extras (the ones it writes to its
   own "Continue Watching" home-screen row). The phone sends them over the TV's ADB, with
   [dadb](https://github.com/mobile-dev-inc/dadb) ([TvLink.kt](app/src/main/java/dev/skiff/TvLink.kt)):
 
@@ -58,12 +81,20 @@ removes it, and so does a swipe, with Undo. Kept on the phone (`files/library.js
 
 ## Setup
 
-1. On the TV: Settings → System → About → press *Android TV OS build* 7 times; then Developer options → turn on
-   **USB debugging**.
-2. Phone and TV on the same Wi-Fi. Open Skiff: the TV shows up under **Nearby TVs**.
-3. The first time you open something, the TV asks **Allow USB debugging?** for the phone: tick *Always allow*.
+1. Phone and TV on the same Wi-Fi. Open Skiff: the TV shows up under **Nearby TVs**; pick it.
+2. **Connect to <your TV>**: tap **Show a code on the TV**, type the code. That's it.
 
-USB debugging stays on for this to work: anything you allowed on the TV can control it.
+For the stream picker and **Open with** (optional): on the TV, Settings → System → About → press *Android TV OS
+build* 7 times; then Developer options → turn on **USB debugging**, and allow the phone when the TV asks (tick
+*Always allow*). It stays on for this to work: anything you allowed on the TV can control it.
+
+## Privacy
+
+Skiff sends crash reports (Firebase Crashlytics) and usage (Firebase Analytics): which screens are opened, and
+whether opening a link, playing a title, connecting the remote, pairing, an ADB command or an APK install worked,
+with how (pairing or USB debugging) and, for links, the site (youtube.com). Never titles, links, typed text or
+commands. **Settings → Privacy** turns both off. Titles' names and art come from Cinemeta; history stays on the phone.
+Details: [PRIVACY.md](PRIVACY.md).
 
 ## Download
 
@@ -77,6 +108,9 @@ key, so a new version installs over the old one.
 ./gradlew assembleDebug
 adb install app/build/outputs/apk/debug/app-debug.apk
 ```
+
+The debug build is **Skiff Debug** (`dev.skiff.debug`, an amber icon): it installs beside the release one. Release
+builds are shrunk with R8 ([proguard-rules.pro](app/proguard-rules.pro)).
 
 Kotlin, Jetpack Compose with Material 3 Expressive and Material You colors, minSdk 26.
 

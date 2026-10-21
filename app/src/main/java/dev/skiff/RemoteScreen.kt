@@ -180,6 +180,12 @@ fun RemoteScreen(host: String, tvName: String, onBack: () -> Unit) {
         }
     }
 
+    // The phone's volume buttons turn the TV's volume while connected; otherwise they're the phone's.
+    DisposableEffect(ready) {
+        HardwareKeys.volume = if (ready) { code -> press(code); true } else null
+        onDispose { HardwareKeys.volume = null }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
