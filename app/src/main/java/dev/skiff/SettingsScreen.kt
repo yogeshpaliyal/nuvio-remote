@@ -356,6 +356,10 @@ fun SettingsScreen(host: String, tvName: String, onBack: () -> Unit) {
                     Spacer(Modifier.width(12.dp))
                     Switch(checked = telemetry, onCheckedChange = { telemetry = it; Telemetry.setEnabled(context, it) })
                 }
+                // Debug builds: crash on purpose, to see a report reach Crashlytics (sent when the app opens again).
+                if (Telemetry.debuggable(context)) {
+                    OutlinedButton(onClick = { Telemetry.testCrash(context) }, enabled = telemetry) { Text("Test crash") }
+                }
             }
             Spacer(Modifier.size(24.dp))
         }

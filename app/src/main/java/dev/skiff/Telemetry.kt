@@ -45,6 +45,20 @@ object Telemetry {
         FirebaseAnalytics.getInstance(context).logEvent(name, b)
     }
 
+    /** A debug build (the test crash is only there). */
+    fun debuggable(context: Context) = (context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
+
+    /**
+     * Crashes the app on purpose, to check the whole Crashlytics flow: the report is sent when the app opens again.
+     * Debug builds only: Settings → Privacy → Test crash, or `adb shell am start -n dev.skiff/.MainActivity --ez
+     * test_crash true`.
+     */
+    fun testCrash(context: Context) {
+        if (!debuggable(context)) return
+        if (available(context)) FirebaseCrashlytics.getInstance().log("Test crash, asked for in Skiff")
+        throw RuntimeException("Test crash from Skiff (debug build)")
+    }
+
     /** A screen of the app (it's one activity, so Analytics can't tell them apart by itself). */
     fun screen(context: Context, name: String) =
         event(context, FirebaseAnalytics.Event.SCREEN_VIEW, FirebaseAnalytics.Param.SCREEN_NAME to name)

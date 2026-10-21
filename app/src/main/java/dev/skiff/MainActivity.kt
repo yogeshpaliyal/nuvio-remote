@@ -110,6 +110,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         Telemetry.init(this)
+        if (intent.getBooleanExtra("test_crash", false)) Telemetry.testCrash(this)
         Rules.init(this)
         shared = sharedTitle(intent)
         setContent {
