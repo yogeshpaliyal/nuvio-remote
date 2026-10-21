@@ -57,6 +57,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -366,18 +367,64 @@ fun SettingsScreen(host: String, tvName: String, onBack: () -> Unit, startOnActi
             }
             // MARK: About
             SectionHeader("About")
+            // Updates: the version, a check now, and a newer one highlighted (tap it for what's new).
+            val update by Updates.update.collectAsState()
+            var checking by remember { mutableStateOf(false) }
+            var checkNote by remember { mutableStateOf<String?>(null) }
+            var showUpdate by remember { mutableStateOf(false) }
+            val current = Updates.current(context)
+            Card(
+                onClick = {
+                    val u = update
+                    if (u != null) showUpdate = true
+                    else if (!checking) {
+                        checking = true
+                        checkNote = null
+                        scope.launch {
+                            checkNote = try {
+                                if (Updates.check(context, force = true) == null) "You have the latest version." else null
+                            } catch (e: Exception) {
+                                "Couldn't check: ${e.message ?: e.javaClass.simpleName}"
+                            }
+                            checking = false
+                        }
+                    }
+                },
+                shape = MaterialTheme.shapes.extraLarge,
+                colors = CardDefaults.cardColors(
+                    containerColor = if (update != null) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer,
+                ),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            update?.let { "Update to ${it.version}" } ?: "Check for updates",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            when {
+                                update != null -> "You have $current. See what's new"
+                                checking -> "Checking…"
+                                checkNote != null -> checkNote!!
+                                else -> "Version $current"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (checking) LoadingIndicator(Modifier.size(24.dp))
+                    else if (update != null) Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null)
+                }
+            }
+            update?.let { u -> if (showUpdate) UpdateSheet(u, onDismiss = { showUpdate = false }) }
             LinkRow("Report an issue", "On GitHub, with Skiff's version and your phone's model filled in") {
                 openLink(context, issueUrl(context))
             }
             LinkRow("Privacy policy", "What Skiff keeps on your phone, and what it sends") {
                 openLink(context, "https://github.com/yogeshpaliyal/skiff/blob/main/PRIVACY.md")
             }
-            Text(
-                "Skiff ${appVersion(context)} · open source on GitHub",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 4.dp),
-            )
 
             // Debug builds: a made-up TV and history, for store screenshots.
             if (Telemetry.debuggable(context)) {

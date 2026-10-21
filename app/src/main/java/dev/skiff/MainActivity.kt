@@ -57,6 +57,8 @@ import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
@@ -209,8 +211,9 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
             }
         }
     }
-    // Newer link rules from the repo, at most once a day.
+    // Newer link rules from the repo, at most once a day; a newer Skiff, at most twice a day.
     LaunchedEffect(Unit) { Rules.refresh(context) }
+    LaunchedEffect(Unit) { runCatching { Updates.check(context) } }
     DisposableEffect(Unit) {
         finder.start()
         onDispose { finder.stop() }
@@ -552,7 +555,13 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                 title = { Text("Skiff", fontWeight = FontWeight.SemiBold) },
                 actions = {
                     IconButton(onClick = { showLibrary = true }) { Icon(AppIcons.History, "History and saved") }
-                    IconButton(onClick = { showSettings = true }) { Icon(Icons.Rounded.Settings, "Settings") }
+                    // A dot on Settings when a newer Skiff is out (Settings → Update).
+                    val update by Updates.update.collectAsState()
+                    IconButton(onClick = { showSettings = true }) {
+                        BadgedBox(badge = { if (update != null) Badge() }) {
+                            Icon(Icons.Rounded.Settings, if (update != null) "Settings: an update is available" else "Settings")
+                        }
+                    }
                 },
             )
         },

@@ -20,6 +20,8 @@ None of this leaves the phone, except to your TV when you send something.
   you type in the search box (not a link or an IMDb id), to find matching titles. Nothing else goes with them.
 - **The page you share**: Skiff reads its title and picture (as a browser would).
 - **Link rules**: once a day, Skiff downloads [rules.json](app/src/main/assets/rules.json) from this repository.
+- **Updates**: about twice a day, Skiff asks GitHub (`api.github.com`) for its latest release, to tell you when there's
+  a newer version. Nothing about you goes with it.
 - **Firebase Crashlytics** (Google): when Skiff crashes, the crash report (stack trace, device model, Android
   version, app version).
 - **Firebase Analytics** (Google): which screens are opened, and whether opening a link, playing a title,
