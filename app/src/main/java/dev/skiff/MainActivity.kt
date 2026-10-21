@@ -52,11 +52,15 @@ import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.ArrowDropDown
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.MaterialShapes
@@ -68,7 +72,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.ToggleButton
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
@@ -90,7 +93,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
@@ -531,32 +533,27 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
         SettingsScreen(host.trim(), tvName, onBack = { showSettings = false }, startOnActivity = openActivity)
         return@AnimatedContent
     }
-    val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    var showTvSheet by remember { mutableStateOf(false) }
+    var showAppSheet by remember { mutableStateOf(false) }
+    // The TV and how it's reached, said once: on the chip under the title.
+    val tvStatus = when {
+        hostOk -> tvLabel + when {
+            useAdb == false -> " · Pairing"
+            adb == null -> " · checking…"
+            adb == TvLink.Adb.ALLOWED -> " · USB debugging"
+            else -> " · not connected yet"
+        }
+        searching -> "Looking for TVs…"
+        else -> "Pick a TV"
+    }
     Scaffold(
-        modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
         topBar = {
-            LargeFlexibleTopAppBar(
-                title = { Text("Skiff") },
-                subtitle = {
-                    Text(
-                        when {
-                            // How titles and links go: the USB debugging check, or pairing.
-                            hostOk -> tvLabel + when {
-                                useAdb == false -> " · Pairing"
-                                adb == null -> " · checking…"
-                                adb == TvLink.Adb.ALLOWED -> " · USB debugging"
-                                else -> " · not connected yet"
-                            }
-                            searching -> "Looking for TVs…"
-                            else -> "No TV picked"
-                        },
-                    )
-                },
+            TopAppBar(
+                title = { Text("Skiff", fontWeight = FontWeight.SemiBold) },
                 actions = {
                     IconButton(onClick = { showLibrary = true }) { Icon(AppIcons.History, "History and saved") }
                     IconButton(onClick = { showSettings = true }) { Icon(Icons.Rounded.Settings, "Settings") }
                 },
-                scrollBehavior = scroll,
             )
         },
         bottomBar = {
@@ -590,61 +587,15 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            // MARK: Your TV
-            SectionHeader("Your TV") {
-                if (!searching) {
-                    TextButton(onClick = { finder.start(); searchRun++ }) {
-                        Icon(Icons.Rounded.Refresh, null, Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Search again")
-                    }
-                }
-            }
-            if (tvs.isEmpty()) {
-                Surface(
+            // MARK: The TV: one chip; tap it for the TVs found, an address, searching again.
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                AssistChip(
+                    onClick = { showTvSheet = true },
+                    label = { Text(tvStatus, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    leadingIcon = { Icon(AppIcons.Tv, null, Modifier.size(18.dp)) },
+                    trailingIcon = { Icon(Icons.Rounded.ArrowDropDown, "Change TV", Modifier.size(20.dp)) },
                     shape = MaterialTheme.shapes.extraLarge,
-                    color = MaterialTheme.colorScheme.surfaceContainer,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
-                        if (searching) LoadingIndicator(Modifier.size(40.dp))
-                        else Icon(AppIcons.Tv, null, Modifier.size(32.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Spacer(Modifier.width(16.dp))
-                        Text(
-                            if (searching) "Looking for TVs on your Wi-Fi…" else "No TV found on this Wi-Fi. Enter its address.",
-                            style = MaterialTheme.typography.bodyLarge,
-                        )
-                    }
-                }
-            }
-            for (tv in tvs) {
-                TvCard(
-                    tv = tv,
-                    selected = tv.host == host.trim(),
-                    paired = Atv.isPaired(context, tv.host),
-                    onClick = {
-                        // Without USB debugging too: it can be paired (the remote shows how).
-                        host = tv.host
-                        tvName = tv.name
-                        manual = false
-                    },
                 )
-            }
-            AnimatedVisibility(visible = manual || (!searching && tvs.none { it.ready })) {
-                OutlinedTextField(
-                    value = host,
-                    onValueChange = { host = it; tvName = "" },
-                    label = { Text("TV address") },
-                    placeholder = { Text("192.168.1.7") },
-                    supportingText = { Text("On the TV: Settings → Network & Internet") },
-                    singleLine = true,
-                    shape = MaterialTheme.shapes.large,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-            if (!manual && tvs.any { it.ready }) {
-                TextButton(onClick = { manual = true }) { Text("Enter an address instead") }
             }
 
             // MARK: Connect (the first time with a TV: pair it, or allow USB debugging)
@@ -674,110 +625,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                 )
             }
 
-            // MARK: Open with (a link: the TV apps that open it)
-            // Only over USB debugging: over pairing the TV picks the app.
-            if (hostOk && linkOk && useAdb == true) {
-                SectionHeader("Open with") {
-                    if (!linkAppsLoading) {
-                        TextButton(onClick = { adbRun++; linkRun++ }) {
-                            Icon(Icons.Rounded.Refresh, null, Modifier.size(18.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text("Check again")
-                        }
-                    }
-                }
-                when {
-                    linkAppsLoading -> Surface(
-                        shape = MaterialTheme.shapes.extraLarge,
-                        color = MaterialTheme.colorScheme.surfaceContainer,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
-                            LoadingIndicator(Modifier.size(40.dp))
-                            Spacer(Modifier.width(16.dp))
-                            Text("Checking which app on $tvLabel opens it…", style = MaterialTheme.typography.bodyLarge)
-                        }
-                    }
-                    linkApps.isEmpty() -> NoteCard(
-                        Icons.Rounded.Warning,
-                        "No app on $tvLabel opens ${link?.let(Links::site)} links. Install its TV app, then try again.",
-                        error = true,
-                    )
-                    else -> for (app in linkApps) {
-                        AppCard(
-                            app.name, app.pkg,
-                            selected = app.component == linkComponent, onClick = { linkComponent = app.component },
-                        )
-                    }
-                }
-            }
-
-            // MARK: Open with (an IMDb title: the Nuvio apps)
-            if (hostOk && !linkOk && useAdb == true) {
-                SectionHeader("Open with") {
-                    if (!appsLoading) {
-                        TextButton(onClick = { adbRun++; appsRun++ }) {
-                            Icon(Icons.Rounded.Refresh, null, Modifier.size(18.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text("Check again")
-                        }
-                    }
-                }
-                when {
-                    appsLoading -> Surface(
-                        shape = MaterialTheme.shapes.extraLarge,
-                        color = MaterialTheme.colorScheme.surfaceContainer,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
-                            LoadingIndicator(Modifier.size(40.dp))
-                            Spacer(Modifier.width(16.dp))
-                            Text(
-                                "Checking $tvLabel's apps… The first time, allow USB debugging on the TV.",
-                                style = MaterialTheme.typography.bodyLarge,
-                            )
-                        }
-                    }
-                    appsError != null -> NoteCard(Icons.Rounded.Warning, appsError!!, error = true)
-                    else -> for (app in apps) {
-                        AppCard(
-                            listOfNotNull(app.name, app.version).joinToString(" · "), "${app.source} · ${app.pkg}",
-                            selected = app.component == appComponent, onClick = { appComponent = app.component },
-                        )
-                    }
-                }
-            }
-
-            // MARK: What to watch
-            SectionHeader("What to watch") {
-                // Start over: the box, the title or link found, its episode, and the last message.
-                if (imdbId.isNotEmpty() || link != null) {
-                    TextButton(onClick = {
-                        link = null
-                        linkTitle = ""
-                        recordLink = false
-                        page = null
-                        imdbId = ""
-                        name = ""
-                        meta = null
-                        series = false
-                        season = 1
-                        episode = 1
-                        autoName = true
-                        keepType = false
-                        editName = false
-                        notFound = false
-                        openWhenKnown = false
-                        status = null
-                        failed = false
-                        hits = emptyList()
-                    }) {
-                        Icon(Icons.Rounded.Close, null, Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Clear")
-                    }
-                }
-            }
+            // MARK: What to watch: the search box first.
             val query = if (link == null && !Title.isImdbId(imdbId)) imdbId.trim() else ""
             LaunchedEffect(query) {
                 if (query.length < 2) { hits = emptyList(); findingTitles = false; return@LaunchedEffect }
@@ -797,25 +645,48 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                         else -> { link = null; imdbId = v.trim(); keepType = false }
                     }
                 },
-                label = { Text("Search, link or IMDb ID") },
-                placeholder = { Text("A title, or a YouTube / JioHotstar link") },
-                supportingText = { Text("Or share a page here: IMDb, JioHotstar, YouTube…") },
+                placeholder = { Text("Search a title, or paste a link") },
+                leadingIcon = { Icon(Icons.Rounded.Search, null) },
                 isError = imdbId.lowercase().startsWith("tt") && imdbId.drop(2).all { it.isDigit() } && imdbId.length > 2 && !idOk,
                 singleLine = true,
-                shape = MaterialTheme.shapes.large,
+                shape = MaterialTheme.shapes.extraLarge,
                 trailingIcon = {
-                    TextButton(onClick = {
-                        clipboard.getText()?.text?.let { t ->
-                            val id = Title.idIn(t)
-                            val l = Links.linkIn(t)
-                            when {
-                                id != null -> { link = null; imdbId = id; autoName = true; keepType = false }
-                                l != null -> { link = l; linkTitle = ""; recordLink = true; imdbId = "" }
+                    if (imdbId.isNotEmpty() || link != null) {
+                        // Start over: the box, the title or link found, its episode, and the last message.
+                        IconButton(onClick = {
+                    link = null
+                    linkTitle = ""
+                    recordLink = false
+                    page = null
+                    imdbId = ""
+                    name = ""
+                    meta = null
+                    series = false
+                    season = 1
+                    episode = 1
+                    autoName = true
+                    keepType = false
+                    editName = false
+                    notFound = false
+                    openWhenKnown = false
+                    status = null
+                    failed = false
+                    hits = emptyList()
+                        }) { Icon(Icons.Rounded.Close, "Clear") }
+                    } else {
+                        TextButton(onClick = {
+                            clipboard.getText()?.text?.let { t ->
+                                val id = Title.idIn(t)
+                                val l = Links.linkIn(t)
+                                when {
+                                    id != null -> { link = null; imdbId = id; autoName = true; keepType = false }
+                                    l != null -> { link = l; linkTitle = ""; recordLink = true; imdbId = "" }
+                                }
                             }
-                        }
-                    }) { Text("Paste") }
+                        }) { Text("Paste") }
+                    }
                 },
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 modifier = Modifier.fillMaxWidth(),
             )
 
@@ -957,6 +828,40 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                 }
             }
 
+
+            // MARK: Open with: one line under the title or link; tap it to choose (over USB debugging).
+            if (hostOk && (idOk || linkOk)) {
+                val chosen = if (linkOk) linkApps.firstOrNull { it.component == linkComponent }?.name ?: linkApps.firstOrNull()?.name
+                    else apps.firstOrNull { it.component == appComponent }?.let { listOfNotNull(it.name, it.version).joinToString(" ") }
+                val loading = if (linkOk) linkAppsLoading else appsLoading
+                val line = when {
+                    useAdb == false -> if (linkOk) "Opens in the TV's app for ${link?.let(Links::site)}" else "Opens in Nuvio, on the title's page"
+                    useAdb == null -> null
+                    loading -> "Checking which app opens it…"
+                    chosen != null -> "Opens in $chosen"
+                    linkOk -> "No app on $tvLabel opens ${link?.let(Links::site)} links"
+                    else -> appsError ?: "No Nuvio app on $tvLabel"
+                }
+                val choosable = useAdb == true && !loading && (if (linkOk) linkApps.size else apps.size) > 1
+                val problem = useAdb == true && !loading && chosen == null
+                if (line != null) {
+                    Surface(
+                        onClick = { showAppSheet = true },
+                        enabled = useAdb == true && !loading,
+                        shape = MaterialTheme.shapes.large,
+                        color = if (problem) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceContainer,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            if (loading) LoadingIndicator(Modifier.size(22.dp)) else Icon(AppIcons.Tv, null, Modifier.size(20.dp))
+                            Spacer(Modifier.width(12.dp))
+                            Text(line, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            if (choosable || problem) Icon(Icons.Rounded.ArrowDropDown, "Choose the app")
+                        }
+                    }
+                }
+            }
+
             AnimatedContent(targetState = status to failed, label = "status") { (s, bad) ->
                 if (s != null) NoteCard(if (bad) Icons.Rounded.Warning else Icons.Rounded.Info, s, error = bad)
             }
@@ -967,6 +872,142 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(vertical = 8.dp),
             )
+        }
+    }
+
+    // The TVs: those found on the Wi-Fi, an address typed in, searching again.
+    if (showTvSheet) {
+        ModalBottomSheet(onDismissRequest = { showTvSheet = false }) {
+            Column(
+                Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                SectionHeader("Your TV") {
+                    if (!searching) {
+                        TextButton(onClick = { finder.start(); searchRun++ }) {
+                            Icon(Icons.Rounded.Refresh, null, Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Search again")
+                        }
+                    }
+                }
+                if (tvs.isEmpty()) {
+                    Surface(
+                        shape = MaterialTheme.shapes.extraLarge,
+                        color = MaterialTheme.colorScheme.surfaceContainer,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
+                            if (searching) LoadingIndicator(Modifier.size(40.dp))
+                            else Icon(AppIcons.Tv, null, Modifier.size(32.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(Modifier.width(16.dp))
+                            Text(
+                                if (searching) "Looking for TVs on your Wi-Fi…" else "No TV found on this Wi-Fi. Enter its address.",
+                                style = MaterialTheme.typography.bodyLarge,
+                            )
+                        }
+                    }
+                }
+                for (tv in tvs) {
+                    TvCard(
+                        tv = tv,
+                        selected = tv.host == host.trim(),
+                        paired = Atv.isPaired(context, tv.host),
+                        onClick = {
+                            // Without USB debugging too: it can be paired (the remote shows how).
+                            host = tv.host
+                            tvName = tv.name
+                            manual = false
+                            showTvSheet = false
+                        },
+                    )
+                }
+                AnimatedVisibility(visible = manual || (!searching && tvs.none { it.ready })) {
+                    OutlinedTextField(
+                        value = host,
+                        onValueChange = { host = it; tvName = "" },
+                        label = { Text("TV address") },
+                        placeholder = { Text("192.168.1.7") },
+                        supportingText = { Text("On the TV: Settings → Network & Internet") },
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.large,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                if (!manual && tvs.any { it.ready }) {
+                    TextButton(onClick = { manual = true }) { Text("Enter an address instead") }
+                }
+
+            }
+        }
+    }
+
+    // Open with: the TV's apps for this title or link (over USB debugging).
+    if (showAppSheet) {
+        ModalBottomSheet(onDismissRequest = { showAppSheet = false }) {
+            Column(
+                Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                SectionHeader("Open with") {
+                    TextButton(onClick = { adbRun++; if (linkOk) linkRun++ else appsRun++ }) {
+                        Icon(Icons.Rounded.Refresh, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Check again")
+                    }
+                }
+                if (linkOk) {
+                    when {
+                        linkAppsLoading -> Surface(
+                            shape = MaterialTheme.shapes.extraLarge,
+                            color = MaterialTheme.colorScheme.surfaceContainer,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
+                                LoadingIndicator(Modifier.size(40.dp))
+                                Spacer(Modifier.width(16.dp))
+                                Text("Checking which app on $tvLabel opens it…", style = MaterialTheme.typography.bodyLarge)
+                            }
+                        }
+                        linkApps.isEmpty() -> NoteCard(
+                            Icons.Rounded.Warning,
+                            "No app on $tvLabel opens ${link?.let(Links::site)} links. Install its TV app, then try again.",
+                            error = true,
+                        )
+                        else -> for (app in linkApps) {
+                            AppCard(
+                                app.name, app.pkg,
+                                selected = app.component == linkComponent, onClick = { linkComponent = app.component; showAppSheet = false },
+                            )
+                        }
+                    }
+                } else {
+                    when {
+                        appsLoading -> Surface(
+                            shape = MaterialTheme.shapes.extraLarge,
+                            color = MaterialTheme.colorScheme.surfaceContainer,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
+                                LoadingIndicator(Modifier.size(40.dp))
+                                Spacer(Modifier.width(16.dp))
+                                Text(
+                                    "Checking $tvLabel's apps… The first time, allow USB debugging on the TV.",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                )
+                            }
+                        }
+                        appsError != null -> NoteCard(Icons.Rounded.Warning, appsError!!, error = true)
+                        else -> for (app in apps) {
+                            AppCard(
+                                listOfNotNull(app.name, app.version).joinToString(" · "), "${app.source} · ${app.pkg}",
+                                selected = app.component == appComponent, onClick = { appComponent = app.component; showAppSheet = false },
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
     }
