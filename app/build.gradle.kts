@@ -39,8 +39,17 @@ android {
     }
 
     buildTypes {
+        // Beside the release build on one phone: its own package (dev.skiff.debug), name and icon (src/debug/res).
+        debug {
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+        }
         release {
-            isMinifyEnabled = false
+            // R8: shrinks and obfuscates the code, drops unused resources; Crashlytics uploads the mapping, so its
+            // stack traces read as the source.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
