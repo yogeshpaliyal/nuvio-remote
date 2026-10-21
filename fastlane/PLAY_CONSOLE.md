@@ -56,8 +56,8 @@ Skiff's own data stays on the phone; Firebase (a service provider, so this isn't
 
 - **Developer account:** $25, once. A new personal account must run a closed test with at least 12 testers for 14
   days before it can publish to everyone.
-- **App bundle:** Play takes an `.aab`, not an `.apk`: the release workflow builds `assembleRelease` today; it needs
-  `bundleRelease` too.
-- **Signing:** with Play App Signing, keep the current key as the upload key (`~/.config/nuvio-remote/release.jks`),
-  so GitHub and Play builds update each other.
+- **App bundle:** each release tag also builds `skiff-<version>.aab` (in the GitHub release): upload that one to
+  Play.
+- **Signing:** done. Play App Signing uses the same key as the GitHub APKs (uploaded with PEPK on 21 Oct 2026), so
+  Play and GitHub builds update each other.
 - **Package:** `dev.skiff`. The debug build (`dev.skiff.debug`) never goes to Play.
