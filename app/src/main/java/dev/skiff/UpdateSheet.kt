@@ -27,10 +27,10 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun UpdateSheet(r: Updates.Release, onDismiss: () -> Unit) {
     val context = LocalContext.current
-    val fromPlay = Updates.fromPlay(context)
+    val fromPlay = Updates.viaPlay
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Skiff ${r.version}", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+            Text(if (r.version.isNotBlank()) "Skiff ${r.version}" else "A new Skiff", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
             Text(
                 "You have ${Updates.current(context)}.",
                 style = MaterialTheme.typography.bodyMedium,
@@ -39,9 +39,13 @@ fun UpdateSheet(r: Updates.Release, onDismiss: () -> Unit) {
             Column(
                 Modifier.fillMaxWidth().heightIn(max = 360.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) { Notes(r.notes) }
+            ) {
+                if (r.notes.isNotBlank()) Notes(r.notes)
+                else Text("What's new is on Skiff's Google Play page.", style = MaterialTheme.typography.bodyMedium)
+            }
             Text(
-                if (fromPlay) "Opens Skiff on Google Play." else "Downloads the APK in your browser: open it to install. Your history stays.",
+                if (fromPlay) "Google Play downloads it while you use Skiff, then Skiff restarts into it. Your history stays."
+                else "Downloads the APK in your browser: open it to install. Your history stays.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

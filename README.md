@@ -107,9 +107,13 @@ so a new version installs over the old one.
 ## Build
 
 ```bash
-./gradlew assembleDebug
-adb install app/build/outputs/apk/debug/app-debug.apk
+./gradlew assembleGithubDebug
+adb install app/build/outputs/apk/github/debug/app-github-debug.apk
 ```
+
+Two flavors, the same app (`dev.skiff`): **github** (the APK on GitHub releases; updates from GitHub) and **play**
+(the bundle for Google Play; updates through Play's in-app updates, as Play requires). `BuildConfig.STORE` says
+which; what differs lives in `app/src/github` and `app/src/play`.
 
 The debug build is **Skiff Debug** (`dev.skiff.debug`, an amber icon): it installs beside the release one. Release
 builds are shrunk with R8 ([proguard-rules.pro](app/proguard-rules.pro)).

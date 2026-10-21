@@ -32,6 +32,20 @@ android {
         versionName = System.getenv("VERSION_NAME") ?: appVersion.getProperty("versionName")
     }
 
+    // Where it's distributed: github (the APK on GitHub releases) or play (the bundle for Google Play). The same app
+    // (dev.skiff); what differs is in src/github and src/play (updates), and BuildConfig.STORE.
+    flavorDimensions += "store"
+    productFlavors {
+        create("github") {
+            dimension = "store"
+            buildConfigField("String", "STORE", "\"github\"")
+        }
+        create("play") {
+            dimension = "store"
+            buildConfigField("String", "STORE", "\"play\"")
+        }
+    }
+
     signingConfigs {
         if (keystoreFile != null) {
             create("release") {
@@ -64,6 +78,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -91,5 +106,7 @@ dependencies {
     implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
     implementation("com.google.firebase:firebase-crashlytics")
     implementation("com.google.firebase:firebase-analytics")
+    // Google Play's in-app updates: the play build only (the github one checks GitHub releases).
+    "playImplementation"("com.google.android.play:app-update-ktx:2.1.0")
     testImplementation("junit:junit:4.13.2")
 }

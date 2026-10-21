@@ -31,6 +31,9 @@ object Telemetry {
         if (!available(context)) return
         FirebaseCrashlytics.getInstance().isCrashlyticsCollectionEnabled = on
         FirebaseAnalytics.getInstance(context).setAnalyticsCollectionEnabled(on)
+        // Which build: github or play (to compare the two).
+        FirebaseAnalytics.getInstance(context).setUserProperty("store", BuildConfig.STORE)
+        FirebaseCrashlytics.getInstance().setCustomKey("store", BuildConfig.STORE)
     }
 
     /** A usage event: `name` and `params` in Analytics' form (lowercase, underscores; short values). */

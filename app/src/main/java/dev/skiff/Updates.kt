@@ -1,46 +1,42 @@
 package dev.skiff
 
 import android.content.Context
-import android.content.Intent
-import android.net.Uri
-import android.os.Build
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.withContext
-import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
+import kotlinx.coroutines.flow.combine
 
 /**
- * Newer versions of Skiff: the latest GitHub release, checked at most twice a day (Settings can check now). Installed
- * from Google Play, the update comes from Play (Play doesn't allow apps to update themselves); otherwise the release's
- * APK is opened in the browser to download and install.
+ * Newer versions of Skiff, from where this build is distributed (BuildConfig.STORE): GitHub releases (the github
+ * build: the APK, in the browser) or Google Play's in-app updates (the play build; Play doesn't allow other ways).
+ * The store-specific part is StoreUpdates, in src/github and src/play.
  */
 object Updates {
-    private const val LATEST = "https://api.github.com/repos/yogeshpaliyal/skiff/releases/latest"
-    private const val EVERY = 12 * 60 * 60 * 1000L
+    /**
+     * A newer release: its version ("1.9.0"; blank when the store doesn't say), what's new (Markdown; blank when the
+     * store doesn't say), and an id for "Later" (the version, or Play's versionCode).
+     */
+    data class Release(val version: String, val notes: String, val apkUrl: String?, val pageUrl: String, val id: String = version)
 
-    /** A release: its version ("1.9.0"), what's new (Markdown), the APK and the release page. */
-    data class Release(val version: String, val notes: String, val apkUrl: String?, val pageUrl: String)
+    /** Updates come from Google Play (the play build). */
+    val viaPlay: Boolean get() = BuildConfig.STORE == "play"
 
     private val available = MutableStateFlow<Release?>(null)
     /** The newer release, when there's one; null when up to date or not checked yet. */
     val update: StateFlow<Release?> = available
 
-    private fun prefs(context: Context) = context.getSharedPreferences("updates", Context.MODE_PRIVATE)
+    internal fun prefs(context: Context) = context.getSharedPreferences("updates", Context.MODE_PRIVATE)
 
-    // The version you said "Later" to: the Settings icon's dot stays off for it (Settings still offers it).
+    // The release you said "Later" to: the Settings icon's dot stays off for it (Settings still offers it).
     private val laterFor = MutableStateFlow<String?>(null)
 
-    /** Whether to put the dot on the Settings icon: a newer version, not one you said "Later" to. */
-    val badge: kotlinx.coroutines.flow.Flow<Boolean> =
-        kotlinx.coroutines.flow.combine(available, laterFor) { r, later -> r != null && r.version != later }
+    /** Whether to put the dot on the Settings icon: a newer release, not one you said "Later" to. */
+    val badge: Flow<Boolean> = combine(available, laterFor) { r, later -> r != null && r.id != later }
 
-    /** "Later" for this version: no dot for it; a newer one brings it back. */
+    /** "Later" for this release: no dot for it; a newer one brings it back. */
     fun later(context: Context, r: Release) {
-        prefs(context).edit().putString("later", r.version).apply()
-        laterFor.value = r.version
+        prefs(context).edit().putString("later", r.id).apply()
+        laterFor.value = r.id
     }
 
     /** This build's version: "1.8.0" (a debug build's "-debug" left off). */
@@ -60,71 +56,16 @@ object Updates {
     }
 
     /**
-     * Off the main thread. Checks GitHub (`force`, or when the last check is old), and updates [update]. Returns
-     * the newer release, or null when up to date. Throws when GitHub can't be reached and `force` is set.
+     * Off the main thread. Asks the store (`force`, or when the last check is old), and updates [update]. Returns the
+     * newer release, or null when up to date. Throws when the store can't be reached and `force` is set.
      */
-    suspend fun check(context: Context, force: Boolean = false): Release? = withContext(Dispatchers.IO) {
-        val p = prefs(context)
-        laterFor.value = p.getString("later", null)
-        val cached = p.getString("latest", null)?.let { runCatching { parse(JSONObject(it)) }.getOrNull() }
-        val fresh = System.currentTimeMillis() - p.getLong("checkedAt", 0) < EVERY
-        val latest = if (!force && fresh && cached != null) cached else {
-            try {
-                val json = fetch()
-                p.edit().putString("latest", json.toString()).putLong("checkedAt", System.currentTimeMillis()).apply()
-                parse(json)
-            } catch (e: Exception) {
-                if (force) throw e
-                cached
-            }
-        }
-        val newer = latest?.takeIf { newer(it.version, current(context)) }
+    suspend fun check(context: Context, force: Boolean = false): Release? {
+        laterFor.value = prefs(context).getString("later", null)
+        val newer = StoreUpdates.check(context, force)
         available.value = newer
-        newer
+        return newer
     }
 
-    private fun fetch(): JSONObject {
-        val c = URL(LATEST).openConnection() as HttpURLConnection
-        c.connectTimeout = 6000
-        c.readTimeout = 8000
-        c.setRequestProperty("Accept", "application/vnd.github+json")
-        try {
-            if (c.responseCode != 200) error("GitHub answered ${c.responseCode}")
-            return JSONObject(c.inputStream.bufferedReader().readText())
-        } finally {
-            c.disconnect()
-        }
-    }
-
-    private fun parse(o: JSONObject): Release {
-        val assets = o.optJSONArray("assets")
-        val apk = (0 until (assets?.length() ?: 0)).map { assets!!.getJSONObject(it) }
-            .firstOrNull { it.optString("name").endsWith(".apk") }?.optString("browser_download_url")
-        return Release(
-            version = o.optString("tag_name").removePrefix("v"),
-            notes = o.optString("body"),
-            apkUrl = apk?.takeIf { it.startsWith("https://") },
-            pageUrl = o.optString("html_url"),
-        )
-    }
-
-    /** Installed from Google Play: updates come from there. */
-    fun fromPlay(context: Context): Boolean = runCatching {
-        val installer = if (Build.VERSION.SDK_INT >= 30) {
-            context.packageManager.getInstallSourceInfo(context.packageName).installingPackageName
-        } else {
-            @Suppress("DEPRECATION") context.packageManager.getInstallerPackageName(context.packageName)
-        }
-        installer == "com.android.vending"
-    }.getOrDefault(false)
-
-    /** Gets the update: Play's page for Skiff, or the release's APK (the browser downloads it; tap it to install). */
-    fun open(context: Context, r: Release) {
-        val url = when {
-            fromPlay(context) -> "https://play.google.com/store/apps/details?id=dev.skiff"
-            r.apkUrl != null -> r.apkUrl
-            else -> r.pageUrl
-        }
-        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
-    }
+    /** Gets the update: the store's way (Play's in-app update, or the APK in the browser). */
+    fun open(context: Context, r: Release) = StoreUpdates.open(context, r)
 }

@@ -16,5 +16,5 @@ jobs:
           java-version: 17
       - uses: gradle/actions/setup-gradle@v4
       # A check that it builds; the APK to install comes from Releases (no artifact: storage is limited).
-      - name: Build the debug APK
-        run: ./gradlew assembleDebug
+      - name: Build the debug APKs (github and play)
+        run: ./gradlew assembleGithubDebug assemblePlayDebug

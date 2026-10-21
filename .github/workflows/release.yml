@@ -2,7 +2,8 @@ name: Release
 
 # Actions → Release → Run workflow, picking patch, minor or major:
 #  1. raises the version in version.properties (1.8.0 → 1.8.1, 1.9.0 or 2.0.0; versionCode + 1);
-#  2. builds the APK (GitHub) and the app bundle (.aab, Google Play), signed with the release key (repo secrets);
+#  2. builds the github flavor's APK (for GitHub) and the play flavor's app bundle (.aab, for Google Play), signed
+#     with the release key (repo secrets);
 #  3. only if that works: commits version.properties to main;
 #  4. tags that commit (v1.9.0) and publishes the release with both files.
 on:
@@ -74,9 +75,9 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           VERSION_NAME: ${{ steps.version.outputs.name }}
         run: |
-          ./gradlew assembleRelease bundleRelease
-          cp app/build/outputs/apk/release/app-release.apk "skiff-${VERSION_NAME}.apk"
-          cp app/build/outputs/bundle/release/app-release.aab "skiff-${VERSION_NAME}.aab"
+          ./gradlew assembleGithubRelease bundlePlayRelease
+          cp app/build/outputs/apk/github/release/app-github-release.apk "skiff-${VERSION_NAME}.apk"
+          cp app/build/outputs/bundle/playRelease/app-play-release.aab "skiff-${VERSION_NAME}.aab"
 
       - name: Check the signatures
         run: |

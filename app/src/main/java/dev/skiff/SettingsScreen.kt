@@ -400,7 +400,7 @@ fun SettingsScreen(host: String, tvName: String, onBack: () -> Unit, startOnActi
                 Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(
-                            update?.let { "Update to ${it.version}" } ?: "Check for updates",
+                            update?.let { if (it.version.isNotBlank()) "Update to ${it.version}" else "Update available" } ?: "Check for updates",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold,
                         )
