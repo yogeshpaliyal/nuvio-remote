@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -186,7 +187,7 @@ fun SettingsScreen(host: String, tvName: String, onBack: () -> Unit, startOnActi
         },
     ) { inner ->
         Column(
-            Modifier.fillMaxSize().padding(inner).imePadding().verticalScroll(rememberScrollState())
+            Modifier.fillMaxSize().padding(inner).consumeWindowInsets(inner).imePadding().verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp).navigationBarsPadding(),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {

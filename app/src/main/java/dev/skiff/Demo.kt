@@ -21,6 +21,9 @@ object Demo {
     fun init(context: Context, fromIntent: Boolean? = null) {
         if (fromIntent != null && Telemetry.debuggable(context)) prefs(context).edit().putBoolean("demo", fromIntent).commit()
         on = Telemetry.debuggable(context) && prefs(context).getBoolean("demo", false)
+        // Out of demo mode: the made-up TV isn't kept as the one picked (the real one is found again).
+        val picked = context.getSharedPreferences("remote", Context.MODE_PRIVATE)
+        if (!on && picked.getString("host", null)?.trim() == HOST) picked.edit().remove("host").remove("tvName").apply()
     }
 
     /** Switches it, and restarts the app so every screen starts over with it. */
