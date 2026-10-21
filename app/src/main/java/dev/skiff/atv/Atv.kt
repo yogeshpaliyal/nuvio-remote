@@ -88,7 +88,11 @@ object Atv {
      * Throws when the TV can't be reached or refuses.
      */
     suspend fun pair(context: Context, host: String): Pairing = withContext(Dispatchers.IO) {
-        val socket = open(context, host, PAIRING_PORT, pinned = null)
+        val socket = try {
+            open(context, host, PAIRING_PORT, pinned = null)
+        } catch (e: java.net.SocketTimeoutException) {
+            error("The TV didn't answer. Check it's on, and on the same Wi-Fi.")
+        }
         try {
             ProtoWriter.frame(socket.outputStream, Messages.pairingRequest("Skiff on ${Build.MODEL}"))
             while (true) {
@@ -102,6 +106,9 @@ object Atv {
                 }
             }
             @Suppress("UNREACHABLE_CODE") error("unreachable")
+        } catch (e: java.net.SocketTimeoutException) {
+            runCatching { socket.close() }
+            error("The TV didn't show a code in time. Try again; check it's on.")
         } catch (e: Exception) {
             runCatching { socket.close() }
             throw e
@@ -300,6 +307,7 @@ object Atv {
         } catch (e: javax.net.ssl.SSLException) {
             throw NotPaired("The TV didn't accept this phone: pair again. (${e.message})")
         }
+        socket.soTimeout = 0     // the TV pings every few seconds; quiet otherwise
         val remote = Remote(socket)
         remote.start()
         try {
@@ -333,7 +341,9 @@ object Atv {
         val tls = SSLContext.getInstance("TLS").apply { init(kmf.keyManagers, arrayOf(pinning(pinned)), null) }
         val socket = tls.socketFactory.createSocket() as SSLSocket
         socket.connect(InetSocketAddress(host.trim(), port), 5_000)
-        socket.soTimeout = 0
+        // Each wait for the TV (the handshake, a pairing step) gives up after 10 s, as androidtvremote2 does: a TV
+        // that doesn't answer mustn't keep a spinner going. The remote's own reader waits without a limit.
+        socket.soTimeout = 10_000
         socket.startHandshake()
         return socket
     }

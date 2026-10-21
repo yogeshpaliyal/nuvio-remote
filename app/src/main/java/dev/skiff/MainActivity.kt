@@ -203,7 +203,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
             val same = found.firstOrNull { usable(it) && it.name == tvName }
             when {
                 same != null -> host = same.host
-                host.isBlank() -> found.singleOrNull { usable(it) }?.let { host = it.host; tvName = it.name }
+                host.isBlank() -> (found.singleOrNull { usable(it) } ?: found.singleOrNull())?.let { host = it.host; tvName = it.name }
             }
         }
     }
