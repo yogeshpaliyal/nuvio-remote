@@ -39,6 +39,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Info
@@ -748,7 +749,35 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
             }
 
             // MARK: What to watch
-            SectionHeader("What to watch")
+            SectionHeader("What to watch") {
+                // Start over: the box, the title or link found, its episode, and the last message.
+                if (imdbId.isNotEmpty() || link != null) {
+                    TextButton(onClick = {
+                        link = null
+                        linkTitle = ""
+                        recordLink = false
+                        page = null
+                        imdbId = ""
+                        name = ""
+                        meta = null
+                        series = false
+                        season = 1
+                        episode = 1
+                        autoName = true
+                        keepType = false
+                        editName = false
+                        notFound = false
+                        openWhenKnown = false
+                        status = null
+                        failed = false
+                        hits = emptyList()
+                    }) {
+                        Icon(Icons.Rounded.Close, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Clear")
+                    }
+                }
+            }
             val query = if (link == null && !Title.isImdbId(imdbId)) imdbId.trim() else ""
             LaunchedEffect(query) {
                 if (query.length < 2) { hits = emptyList(); findingTitles = false; return@LaunchedEffect }
