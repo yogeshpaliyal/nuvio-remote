@@ -1,0 +1,26 @@
+Found something to watch on your phone? Share the link to Skiff and it opens on your Android TV or Google TV, in the app that plays it.
+
+How it works
+• Share a link from any app (a video, a film, a show's page) and pick Skiff.
+• Skiff finds the TVs on your Wi-Fi by their names.
+• The link opens on the TV, in its app for that link.
+
+Setting up
+Pick your TV and type the code it shows, once. Nothing to change in the TV's settings: it pairs the same way the Google TV app does.
+
+A remote, too
+• D-pad, Home, Back, volume, playback and power
+• Type on the TV with your phone's keyboard
+• Your phone's volume buttons turn the TV up and down
+• A Quick Settings tile opens the remote from anywhere
+
+Also
+• History of everything you sent, and a list saved for later
+• If you use USB debugging on the TV, Skiff can use it too: pick which TV app opens a link, run a command, or install an APK on the TV
+
+Privacy
+No account and no ads. Your history stays on your phone. Skiff sends crash reports and which features are used, never what you watch or type, and one switch in Settings turns that off.
+
+Free and open source: github.com/yogeshpaliyal/skiff
+
+Skiff isn't affiliated with Google or any streaming service.

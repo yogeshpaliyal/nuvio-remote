@@ -1,0 +1,22 @@
+<!doctype html><meta charset="utf-8"><title>Play feature graphic</title>
+<!-- The Play Store feature graphic, 1024×500: the landing page's TV, on sea glass. -->
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; width: 1024px; height: 500px; overflow: hidden; background: #E8EFEC; font-family: "Bricolage Grotesque", sans-serif; }
+  .mark { position: absolute; left: 64px; top: 56px; display: flex; align-items: center; gap: 14px; font-weight: 800; font-size: 34px; color: #1B1530; letter-spacing: -0.01em; }
+  .mark img { width: 52px; height: 52px; }
+  .line { position: absolute; left: 64px; bottom: 72px; width: 340px; font-weight: 700; font-size: 26px; line-height: 1.2; color: #1B1530; letter-spacing: -0.015em; }
+  .tv { position: absolute; right: 52px; top: 70px; width: 520px; background: #24212B; border-radius: 22px; padding: 12px;
+    box-shadow: 0 30px 60px -30px rgba(20,16,40,.55); }
+  .screen { aspect-ratio: 16 / 9; border-radius: 10px; color: #F6F3FF; display: flex; flex-direction: column; justify-content: flex-end; padding: 34px;
+    background: radial-gradient(120% 90% at 30% 20%, #2B2466 0%, #1D1846 55%, #141033 100%); box-sizing: border-box; position: relative; }
+  .corner { position: absolute; top: 22px; left: 34px; font-size: 15px; color: rgba(246,243,255,.62); }
+  h1 { margin: 0; font-weight: 800; font-size: 60px; line-height: .94; letter-spacing: -0.04em; }
+  h1 svg { width: .62em; height: .62em; margin-left: .12em; vertical-align: .02em; }
+  .stand { width: 120px; height: 14px; margin: 0 auto; background: #24212B; border-radius: 0 0 10px 10px; }
+</style>
+<div class="mark"><img src="../logo.svg" alt="">Skiff</div>
+<div class="line">Share a link on your phone.<br>It plays on your TV.</div>
+<div class="tv"><div class="screen"><div class="corner">Living room TV</div>
+  <h1>Send it<br>to the TV<svg viewBox="0 0 26 26"><path d="M5 2 L5 22 L23 13 Z" fill="#FFCB47" stroke="#FFCB47" stroke-width="3" stroke-linejoin="round"/></svg></h1></div>
+  <div class="stand" style="position:absolute;left:50%;transform:translateX(-50%);bottom:-14px"></div></div>
