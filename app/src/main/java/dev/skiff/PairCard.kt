@@ -39,7 +39,15 @@ import kotlinx.coroutines.launch
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun PairCard(host: String, onPaired: () -> Unit, modifier: Modifier = Modifier, onCancel: (() -> Unit)? = null) {
+fun PairCard(
+    host: String,
+    onPaired: () -> Unit,
+    modifier: Modifier = Modifier,
+    onCancel: (() -> Unit)? = null,
+    title: String = "Pair with this TV",
+    intro: String = "Like the Google TV app: the TV shows a code, you type it here. No developer options or USB debugging.",
+    footer: @Composable () -> Unit = {},
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var pairing by remember { mutableStateOf<Atv.Pairing?>(null) }
@@ -91,10 +99,9 @@ fun PairCard(host: String, onPaired: () -> Unit, modifier: Modifier = Modifier, 
 
     Surface(shape = MaterialTheme.shapes.extraLarge, color = MaterialTheme.colorScheme.secondaryContainer, modifier = modifier.fillMaxWidth()) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Pair with this TV", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Text(
-                if (pairing == null) "Like the Google TV app: the TV shows a code, you type it here. No developer options or USB debugging."
-                else "Type the code shown on the TV.",
+                if (pairing == null) intro else "Type the code shown on the TV.",
                 style = MaterialTheme.typography.bodyMedium,
             )
             if (pairing != null) {
@@ -120,6 +127,7 @@ fun PairCard(host: String, onPaired: () -> Unit, modifier: Modifier = Modifier, 
                 }
                 if (busy) LoadingIndicator(Modifier.size(28.dp))
             }
+            if (pairing == null) footer()
         }
     }
 }

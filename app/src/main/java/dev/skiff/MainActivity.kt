@@ -237,7 +237,8 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
     // How titles and links reach the TV: USB debugging first (Open with lists the TV's apps; Nuvio goes straight to
     // the streams), else pairing (the TV picks the app; Nuvio opens the title's page: nuvio://movie/tt…). Settings
     // can fix it to one. Checked again when the remote or Settings close (pairing and allowing happen there).
-    val paired = remember(host.trim(), showRemote, showSettings) { hostOk && Atv.isPaired(context, host) }
+    var pairedRun by remember { mutableIntStateOf(0) }     // paired from the connect card
+    val paired = remember(host.trim(), showRemote, showSettings, pairedRun) { hostOk && Atv.isPaired(context, host) }
     val linkVia = remember(host.trim(), showSettings) { Connection.link(context, host) }
     var adb by remember { mutableStateOf<TvLink.Adb?>(null) }      // null: checking
     var adbRun by remember { mutableIntStateOf(0) }
@@ -247,14 +248,16 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
         delay(500)      // typing an address: wait for the whole of it
         adb = TvLink.check(context, host)
     }
-    // true: USB debugging; false: pairing; null: still checking. Not allowed and not paired: USB debugging (it asks).
+    // Neither way works yet (not paired, USB debugging off or this phone not allowed): the connect card, first.
+    val needsSetup = hostOk && linkVia == Connection.Via.AUTO && !paired && adb != null && adb != TvLink.Adb.ALLOWED
+    // true: USB debugging; false: pairing; null: still checking, or not connected yet.
     val useAdb: Boolean? = when (linkVia) {
         Connection.Via.ADB -> true
         Connection.Via.PAIRING -> false
         Connection.Via.AUTO -> when {
-            adb == null -> null
+            adb == null || needsSetup -> null
             adb == TvLink.Adb.ALLOWED -> true
-            else -> !paired
+            else -> false
         }
     }
     val linkByPairing = linkOk && useAdb == false
@@ -510,8 +513,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
                                 useAdb == false -> " · Pairing"
                                 adb == null -> " · checking…"
                                 adb == TvLink.Adb.ALLOWED -> " · USB debugging"
-                                adb == TvLink.Adb.NOT_ALLOWED -> " · allow USB debugging on the TV"
-                                else -> " · USB debugging off: pair it from the remote"
+                                else -> " · not connected yet"
                             }
                             searching -> "Looking for TVs…"
                             else -> "No TV picked"
@@ -533,6 +535,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
                 hint = when {
                     busy -> null
                     !hostOk -> "Pick a TV above"
+                    needsSetup -> "Connect to $tvLabel above"
                     linkByPairing -> null
                     linkOk && linkAppsLoading -> "Checking which TV app opens it…"
                     linkOk && linkApps.isEmpty() -> "No app on $tvLabel opens ${link?.let(Links::site)} links"
@@ -609,6 +612,33 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
             }
             if (!manual && tvs.any { it.ready }) {
                 TextButton(onClick = { manual = true }) { Text("Enter an address instead") }
+            }
+
+            // MARK: Connect (the first time with a TV: pair it, or allow USB debugging)
+            if (needsSetup) {
+                PairCard(
+                    host,
+                    onPaired = { pairedRun++ },
+                    title = "Connect to $tvLabel",
+                    intro = if (adb == TvLink.Adb.NOT_ALLOWED) {
+                        "$tvLabel is asking “Allow USB debugging?”: allow it (tick Always allow), then Check again. " +
+                            "Or pair instead: the TV shows a code, you type it here."
+                    } else {
+                        "One time only: the TV shows a code, you type it here. Nothing to change in the TV's settings."
+                    },
+                    footer = {
+                        Text(
+                            "Already use USB debugging (Developer options)? Turn it on, then check again.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        TextButton(onClick = { adbRun++ }) {
+                            Icon(Icons.Rounded.Refresh, null, Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Check again")
+                        }
+                    },
+                )
             }
 
             // MARK: Open with (a link: the TV apps that open it)
