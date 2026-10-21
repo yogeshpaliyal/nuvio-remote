@@ -50,9 +50,6 @@ import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
@@ -235,35 +232,39 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
     val hostOk = host.trim().isNotEmpty()
     val idOk = Title.isImdbId(imdbId)
     val linkOk = link != null
-    // Paired with this TV: links open over the remote protocol, not ADB (the TV picks the app). Checked again when
-    // the remote closes (pairing happens there).
+    // How titles and links reach the TV: USB debugging first (Open with lists the TV's apps; Nuvio goes straight to
+    // the streams), else pairing (the TV picks the app; Nuvio opens the title's page: nuvio://movie/tt…). Settings
+    // can fix it to one. Checked again when the remote or Settings close (pairing and allowing happen there).
     val paired = remember(host.trim(), showRemote, showSettings) { hostOk && Atv.isPaired(context, host) }
-    // How links open, per TV (Settings, or the switch under Open with): Automatic is USB debugging when the TV answers
-    // there (the TV's apps listed: you pick one, and the link's rules apply), else pairing (the TV picks the app).
-    var linkVia by remember(host.trim(), showSettings) { mutableStateOf(Connection.link(context, host)) }
-    var linkAdbOk by remember { mutableStateOf<Boolean?>(null) }     // the TV's ADB answered the app lookup; null: checking
-    val linkByPairing = linkOk && when (linkVia) {
-        Connection.Via.AUTO -> paired && linkAdbOk == false
-        Connection.Via.PAIRING -> true
-        Connection.Via.ADB -> false
+    val linkVia = remember(host.trim(), showSettings) { Connection.link(context, host) }
+    var adb by remember { mutableStateOf<TvLink.Adb?>(null) }      // null: checking
+    var adbRun by remember { mutableIntStateOf(0) }
+    LaunchedEffect(host.trim(), adbRun, showRemote, showSettings) {
+        adb = null
+        if (host.isBlank()) return@LaunchedEffect
+        delay(500)      // typing an address: wait for the whole of it
+        adb = TvLink.check(context, host)
     }
-    // An IMDb title over pairing: Nuvio's own link (nuvio://movie/tt…) opens its page, the stream picked there. Over
-    // USB debugging it goes straight to the streams (and the episode). The same choice as links; Automatic is USB
-    // debugging when Nuvio answers there, else pairing.
-    val titleByPairing = idOk && !linkOk && when (linkVia) {
-        Connection.Via.AUTO -> paired && apps.isEmpty() && !appsLoading
-        Connection.Via.PAIRING -> true
-        Connection.Via.ADB -> false
+    // true: USB debugging; false: pairing; null: still checking. Not allowed and not paired: USB debugging (it asks).
+    val useAdb: Boolean? = when (linkVia) {
+        Connection.Via.ADB -> true
+        Connection.Via.PAIRING -> false
+        Connection.Via.AUTO -> when {
+            adb == null -> null
+            adb == TvLink.Adb.ALLOWED -> true
+            else -> !paired
+        }
     }
-    val ready = hostOk && (idOk || (linkOk && (linkApps.isNotEmpty() || linkByPairing))) && !busy
+    val linkByPairing = linkOk && useAdb == false
+    val titleByPairing = idOk && !linkOk && useAdb == false
+    val ready = hostOk && useAdb != null && (idOk || (linkOk && (linkApps.isNotEmpty() || linkByPairing))) && !busy
     val tvLabel = tvName.ifEmpty { host.trim().ifEmpty { "the TV" } }
 
     // A TV picked: which Nuvio apps it has (connecting is also when it asks to allow this phone, the first time).
-    LaunchedEffect(host.trim(), appsRun) {
+    LaunchedEffect(host.trim(), appsRun, useAdb) {
         apps = emptyList()
         appsError = null
-        if (host.isBlank()) return@LaunchedEffect
-        delay(500)      // typing an address: wait for the whole of it
+        if (host.isBlank() || useAdb != true) return@LaunchedEffect
         appsLoading = true
         try {
             val found = TvLink.apps(context, host)
@@ -271,11 +272,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
             if (found.none { it.component == appComponent }) appComponent = found.firstOrNull()?.component
             if (found.isEmpty()) appsError = "There's no Nuvio app on $tvLabel. Install it from the Play Store or GitHub."
         } catch (e: Exception) {
-            appsError = if (Atv.isPaired(context, host)) {
-                "Nuvio over USB debugging isn't reachable on $tvLabel: Settings → Links → Automatic or Pairing opens titles paired."
-            } else {
-                "Couldn't reach $tvLabel: ${e.message ?: e.javaClass.simpleName}"
-            }
+            appsError = "Couldn't reach $tvLabel: ${e.message ?: e.javaClass.simpleName}"
         } finally {
             appsLoading = false
         }
@@ -411,14 +408,12 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
         page = p
         if (recordLink) library.useLink(l, p, null, played = false)
     }
-    LaunchedEffect(link, host.trim(), shareRun, linkRun, linkVia, paired) {
+    LaunchedEffect(link, host.trim(), shareRun, linkRun, useAdb) {
         linkApps = emptyList()
-        linkAdbOk = null
         val l = link ?: return@LaunchedEffect
-        if (host.isBlank()) return@LaunchedEffect
-        if (linkVia == Connection.Via.PAIRING) {
-            // Over pairing only: no app to look up, the TV picks it.
-            linkAdbOk = false
+        if (host.isBlank() || useAdb == null) return@LaunchedEffect
+        if (!useAdb) {
+            // Over pairing: no app to look up, the TV picks it.
             if (openWhenKnown) {
                 openWhenKnown = false
                 if (!busy) openLinkOnTv(byPairing = true)
@@ -427,29 +422,19 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
         }
         delay(300)
         linkAppsLoading = true
-        // Automatic and paired: no USB debugging is fine, the link goes over pairing.
-        val pairingFallback = linkVia == Connection.Via.AUTO && paired
         try {
             val found = TvLink.linkApps(context, host, l)
             linkApps = found
-            linkAdbOk = true
             if (found.none { it.component == linkComponent }) linkComponent = found.firstOrNull()?.component
         } catch (e: Exception) {
-            linkAdbOk = false
-            if (!pairingFallback) {
-                failed = true
-                status = "Couldn't reach $tvLabel: ${e.message ?: e.javaClass.simpleName}"
-            }
+            failed = true
+            status = "Couldn't reach $tvLabel: ${e.message ?: e.javaClass.simpleName}"
         } finally {
             linkAppsLoading = false
         }
         if (openWhenKnown) {
             openWhenKnown = false
-            when {
-                busy -> {}
-                linkApps.isNotEmpty() -> openLinkOnTv(byPairing = false)
-                linkAdbOk == false && pairingFallback -> openLinkOnTv(byPairing = true)
-            }
+            if (linkApps.isNotEmpty() && !busy) openLinkOnTv(byPairing = false)
         }
     }
 
@@ -511,8 +496,14 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
                 subtitle = {
                     Text(
                         when {
-                            hostOk && tvs.any { it.ready && it.host == host.trim() } -> "$tvLabel · ready"
-                            hostOk -> tvLabel
+                            // How titles and links go: the USB debugging check, or pairing.
+                            hostOk -> tvLabel + when {
+                                useAdb == false -> " · Pairing"
+                                adb == null -> " · checking…"
+                                adb == TvLink.Adb.ALLOWED -> " · USB debugging"
+                                adb == TvLink.Adb.NOT_ALLOWED -> " · allow USB debugging on the TV"
+                                else -> " · USB debugging off: pair it from the remote"
+                            }
                             searching -> "Looking for TVs…"
                             else -> "No TV picked"
                         },
@@ -611,36 +602,18 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
             }
 
             // MARK: Open with (a link: the TV apps that open it)
-            if (hostOk && linkOk) {
+            // Only over USB debugging: over pairing the TV picks the app.
+            if (hostOk && linkOk && useAdb == true) {
                 SectionHeader("Open with") {
-                    if (!linkAppsLoading && !linkByPairing) {
-                        TextButton(onClick = { linkRun++ }) {
+                    if (!linkAppsLoading) {
+                        TextButton(onClick = { adbRun++; linkRun++ }) {
                             Icon(Icons.Rounded.Refresh, null, Modifier.size(18.dp))
                             Spacer(Modifier.width(6.dp))
                             Text("Check again")
                         }
                     }
                 }
-                if (paired) {
-                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                        listOf("Pairing" to false, "USB debugging" to true).forEachIndexed { i, (label, adb) ->
-                            SegmentedButton(
-                                selected = linkByPairing != adb,
-                                onClick = {
-                                    linkVia = if (adb) Connection.Via.ADB else Connection.Via.PAIRING
-                                    Connection.setLink(context, host, linkVia)
-                                },
-                                shape = SegmentedButtonDefaults.itemShape(i, 2),
-                            ) { Text(label) }
-                        }
-                    }
-                }
                 when {
-                    linkByPairing -> NoteCard(
-                        Icons.Rounded.Check,
-                        "Paired with $tvLabel: it opens the link in its app for ${link?.let(Links::site)}.",
-                        error = false,
-                    )
                     linkAppsLoading -> Surface(
                         shape = MaterialTheme.shapes.extraLarge,
                         color = MaterialTheme.colorScheme.surfaceContainer,
@@ -654,8 +627,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
                     }
                     linkApps.isEmpty() -> NoteCard(
                         Icons.Rounded.Warning,
-                        if (paired) "No app on $tvLabel opens ${link?.let(Links::site)} links over USB debugging (or it's off on the TV). Pairing lets the TV open it."
-                        else "No app on $tvLabel opens ${link?.let(Links::site)} links. Install its TV app, then try again.",
+                        "No app on $tvLabel opens ${link?.let(Links::site)} links. Install its TV app, then try again.",
                         error = true,
                     )
                     else -> for (app in linkApps) {
@@ -668,10 +640,10 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
             }
 
             // MARK: Open with (an IMDb title: the Nuvio apps)
-            if (hostOk && !linkOk) {
+            if (hostOk && !linkOk && useAdb == true) {
                 SectionHeader("Open with") {
                     if (!appsLoading) {
-                        TextButton(onClick = { appsRun++ }) {
+                        TextButton(onClick = { adbRun++; appsRun++ }) {
                             Icon(Icons.Rounded.Refresh, null, Modifier.size(18.dp))
                             Spacer(Modifier.width(6.dp))
                             Text("Check again")
@@ -693,12 +665,6 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
                             )
                         }
                     }
-                    titleByPairing -> NoteCard(
-                        Icons.Rounded.Check,
-                        "Paired with $tvLabel: Nuvio opens the title's page, and you pick the stream there" +
-                            (if (series) " (and the episode)" else "") + ". Straight to the streams needs USB debugging.",
-                        error = false,
-                    )
                     appsError != null -> NoteCard(Icons.Rounded.Warning, appsError!!, error = true)
                     else -> for (app in apps) {
                         AppCard(

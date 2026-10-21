@@ -104,8 +104,9 @@ fun RemoteScreen(host: String, tvName: String, onBack: () -> Unit) {
     var typed by remember { mutableStateOf("") }
     val ready = remote != null
 
-    // Connected while the remote is showing, as Settings says: Automatic is paired (the Google TV remote protocol)
-    // first, else the TV's ADB (USB debugging; the first time, the TV asks to allow this phone), else: pair.
+    // Connected while the remote is showing, as Settings says: Automatic is USB debugging when this phone is allowed
+    // there, else paired (the Google TV remote protocol), else USB debugging anyway (the TV asks to allow this phone),
+    // else: pair.
     LaunchedEffect(host, attempt) {
         error = null
         remote?.close()
@@ -114,29 +115,35 @@ fun RemoteScreen(host: String, tvName: String, onBack: () -> Unit) {
             error = "Pick a TV first."
             return@LaunchedEffect
         }
-        var pairedFailed: String? = null
-        if (mode != Connection.Via.ADB && Atv.isPaired(context, host)) {
-            try {
-                remote = Atv.connect(context, host)
-                via = "Pairing"
-                ActivityLog.add(context, "Remote connected", via)
-                return@LaunchedEffect
-            } catch (e: Exception) {
-                pairedFailed = e.message
-            }
-        }
-        if (mode == Connection.Via.PAIRING) {
-            error = pairedFailed ?: "Pair with ${tvName.ifEmpty { "the TV" }} to use the remote (Settings: Pairing only)."
-            return@LaunchedEffect
-        }
-        try {
+        val name = tvName.ifEmpty { "the TV" }
+        suspend fun viaAdb(): Boolean = try {
             remote = TvLink.remote(context, host)
             via = "USB debugging"
+            error = null
             ActivityLog.add(context, "Remote connected", via)
+            true
         } catch (e: Exception) {
-            error = when {
-                mode == Connection.Via.ADB -> "Couldn't reach ${tvName.ifEmpty { "the TV" }} over USB debugging: ${e.message ?: e.javaClass.simpleName}"
-                else -> pairedFailed ?: "Pair with ${tvName.ifEmpty { "the TV" }} to use the remote: no USB debugging needed."
+            error = "Couldn't reach $name over USB debugging: ${e.message ?: e.javaClass.simpleName}"
+            false
+        }
+        suspend fun viaPairing(): Boolean = try {
+            remote = Atv.connect(context, host)
+            via = "Pairing"
+            error = null
+            ActivityLog.add(context, "Remote connected", via)
+            true
+        } catch (e: Exception) {
+            error = e.message ?: "Pair with $name to use the remote."
+            false
+        }
+        val paired = Atv.isPaired(context, host)
+        when (mode) {
+            Connection.Via.ADB -> viaAdb()
+            Connection.Via.PAIRING -> if (paired) viaPairing() else error = "Pair with $name to use the remote (Settings: Pairing only)."
+            Connection.Via.AUTO -> when {
+                TvLink.check(context, host) == TvLink.Adb.ALLOWED -> viaAdb() || (paired && viaPairing())
+                paired -> viaPairing()
+                !viaAdb() -> error = "Pair with $name to use the remote: no USB debugging needed."
             }
         }
     }
@@ -239,8 +246,10 @@ fun RemoteScreen(host: String, tvName: String, onBack: () -> Unit) {
                 }
             }
 
-            // Pairing: when there's no connection, or to stop needing USB debugging (not when Settings says USB debugging).
-            if (mode != Connection.Via.ADB && (error != null || via == "USB debugging")) {
+            // Pairing: when there's no connection, or (not paired yet) to stop needing USB debugging. Not when Settings
+            // says USB debugging.
+            val paired = remember(host, attempt) { Atv.isPaired(context, host) }
+            if (mode != Connection.Via.ADB && (error != null || (via == "USB debugging" && !paired))) {
                 PairCard(host, onPaired = { attempt++ })
             }
 

@@ -92,12 +92,12 @@ fun SettingsScreen(host: String, tvName: String, onBack: () -> Unit) {
     var pairOpen by remember { mutableStateOf(false) }
     var remoteVia by remember(host) { mutableStateOf(Connection.remote(context, host)) }
     var linkVia by remember(host) { mutableStateOf(Connection.link(context, host)) }
-    var adbOk by remember(host) { mutableStateOf<Boolean?>(null) }     // null: checking
+    var adb by remember(host) { mutableStateOf<TvLink.Adb?>(null) }     // null: checking
     var adbRun by remember { mutableIntStateOf(0) }
     LaunchedEffect(host, adbRun) {
-        adbOk = null
+        adb = null
         if (!hostOk) return@LaunchedEffect
-        adbOk = runCatching { TvLink.shell(context, host, "true") }.isSuccess
+        adb = TvLink.check(context, host)
     }
 
     // ADB tools
@@ -181,9 +181,14 @@ fun SettingsScreen(host: String, tvName: String, onBack: () -> Unit) {
                     StatusRow("Pairing", if (paired) "Paired" else "Not paired", if (paired) true else null)
                     StatusRow(
                         "USB debugging",
-                        when (adbOk) { null -> "Checking…"; true -> "On, this phone allowed"; false -> "Off, or this phone not allowed yet" },
-                        adbOk,
-                        action = { if (adbOk != null) TextButton(onClick = { adbRun++ }) { Icon(Icons.Rounded.Refresh, "Check again", Modifier.size(18.dp)) } },
+                        when (adb) {
+                            null -> "Checking…"
+                            TvLink.Adb.ALLOWED -> "Allowed for this phone"
+                            TvLink.Adb.NOT_ALLOWED -> "On, but this phone isn't allowed: on the TV, allow it (tick Always allow), then check again"
+                            TvLink.Adb.OFF -> "Off (Settings → System → Developer options on the TV)"
+                        },
+                        adb?.let { it == TvLink.Adb.ALLOWED },
+                        action = { if (adb != null) TextButton(onClick = { adbRun++ }) { Icon(Icons.Rounded.Refresh, "Check again", Modifier.size(18.dp)) } },
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         if (paired) {
@@ -215,14 +220,14 @@ fun SettingsScreen(host: String, tvName: String, onBack: () -> Unit) {
 
             // MARK: ADB tools
             SectionHeader("ADB tools")
-            if (hostOk && adbOk == false) {
+            if (hostOk && adb != null && adb != TvLink.Adb.ALLOWED) {
                 Text(
                     "These need USB debugging on $tvLabel (Settings → System → Developer options), and this phone allowed.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            val tools = hostOk && adbOk == true
+            val tools = hostOk && adb == TvLink.Adb.ALLOWED
             Panel {
                 Text("Run a command", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                 Text(
@@ -380,13 +385,13 @@ private fun ViaChoice(via: Connection.Via, onChange: (Connection.Via) -> Unit) {
 }
 
 private fun viaHelp(via: Connection.Via, what: String) = when (via) {
-    Connection.Via.AUTO -> "Automatic: $what over pairing when paired, else over USB debugging."
+    Connection.Via.AUTO -> "Automatic: $what over USB debugging when this phone is allowed, else over pairing."
     Connection.Via.PAIRING -> "Only over pairing (the Google TV remote protocol)."
     Connection.Via.ADB -> "Only over USB debugging (ADB)."
 }
 
 private fun linkHelp(via: Connection.Via) = when (via) {
-    Connection.Via.AUTO -> "Automatic: over USB debugging when it's on (the TV's apps listed to pick from), else over pairing."
+    Connection.Via.AUTO -> "Automatic: over USB debugging when this phone is allowed (Open with lists the TV's apps), else over pairing."
     else -> viaHelp(via, "")
 }
 

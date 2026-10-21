@@ -50,6 +50,22 @@ object TvLink {
     private suspend fun <T> withTv(context: Context, host: String, block: (Dadb) -> T): T =
         lock.withLock { withContext(Dispatchers.IO) { connect(context, host).use(block) } }
 
+    /** USB debugging on the TV, for this phone: allowed, on but this phone not allowed (yet), or off. */
+    enum class Adb { ALLOWED, NOT_ALLOWED, OFF }
+
+    /**
+     * Off the main thread. A quick look (a few seconds at most): the port shut is OFF; open but no answer to this
+     * phone's key is NOT_ALLOWED (the TV then shows "Allow USB debugging?": allowed there, the next check passes).
+     */
+    suspend fun check(context: Context, host: String): Adb = lock.withLock {
+        withContext(Dispatchers.IO) {
+            val open = runCatching { java.net.Socket().use { it.connect(java.net.InetSocketAddress(host.trim(), PORT), 2_000) } }.isSuccess
+            if (!open) return@withContext Adb.OFF
+            runCatching { connect(context, host, answer = 4_000).use { it.shell("true") } }
+                .fold(onSuccess = { Adb.ALLOWED }, onFailure = { Adb.NOT_ALLOWED })
+        }
+    }
+
     /** Off the main thread. A shell command on the TV, as `adb shell` runs it (Settings → ADB tools). */
     suspend fun shell(context: Context, host: String, command: String): dadb.AdbShellResponse =
         withTv(context, host) { it.shell(command) }

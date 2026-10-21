@@ -3,8 +3,8 @@ package dev.skiff
 import android.content.Context
 
 /**
- * How each TV is reached, for the remote and for links (Settings): Automatic (paired: the Google TV remote protocol,
- * else the TV's ADB), Pairing only, or USB debugging (ADB) only. IMDb titles follow the links' choice
+ * How each TV is reached, for the remote and for links (Settings): Automatic (the TV's ADB when this phone is allowed,
+ * else paired: the Google TV remote protocol), Pairing only, or USB debugging (ADB) only. IMDb titles follow the links' choice
  * (over pairing, Nuvio's own link: nuvio://movie/tt…).
  */
 object Connection {
