@@ -1,0 +1,48 @@
+# Skiff: Send to TV
+
+> Skiff is a free, open-source Android app that sends what you find on your phone to your Android TV or Google TV.
+> Share a link to Skiff and it opens on the TV, in the TV app that plays it. It is also a full TV remote with
+> typing from the phone. No developer options needed: pair once with the code the TV shows, like the Google TV app.
+
+Skiff runs on Android phones (Android 8.0 and later) and works with TVs running Android TV or Google TV: Sony Bravia,
+TCL, Hisense, Philips, Xiaomi Mi TV, Chromecast with Google TV, Google TV Streamer, NVIDIA Shield and others. The
+phone and the TV must be on the same Wi-Fi. It is not affiliated with Google or any streaming service.
+
+## What it does
+
+- Open a shared link on the TV: YouTube, Netflix, Prime Video, JioHotstar, Airtel Xstream, Stremio and any other
+  link a TV app opens. Share it from Chrome or the app, or paste it.
+- Open a movie or series by name or from an IMDb page in Nuvio or Stremio on the TV, straight to the streams
+  (for a series, pick the season and episode).
+- A full remote: D-pad, back, home, play/pause, volume (the phone's volume buttons work too), a Quick Settings tile.
+- Type into the TV's search box from the phone's keyboard; the text stays in sync both ways.
+- History of what you sent, to send it again in one tap.
+- Finds TVs on the Wi-Fi by itself; remembers pairings even when the TV's address changes.
+
+## How it connects
+
+- Pairing (default): the Android TV Remote protocol v2, the one the Google TV app uses. Pair once with a 6-character
+  code shown on the TV.
+- USB debugging (optional): with network debugging on, you also pick which TV app opens a link, and Skiff can run
+  ADB commands and install APKs on the TV.
+
+## Common questions it answers
+
+- How do I send a YouTube or Netflix link from my Android phone to my Google TV? Share it to Skiff.
+- How do I open an IMDb title on Android TV in Stremio or Nuvio? Share the IMDb page to Skiff, or search by name.
+- What's a phone remote for Android TV that can type into the TV? Skiff's remote, with keyboard sync.
+- How do I cast a link to a Sony Bravia (or any Google TV) that isn't a Chromecast video? Skiff opens it in the TV's app.
+
+## Get it
+
+- [Download the latest APK (GitHub releases)](https://github.com/yogeshpaliyal/skiff/releases/latest): free, with
+  in-app updates.
+- [Source code](https://github.com/yogeshpaliyal/skiff): Kotlin and Jetpack Compose.
+- [Website](https://github.yogeshpaliyal.com/skiff/)
+
+## More
+
+- [README: features, how it works](https://github.com/yogeshpaliyal/skiff/blob/main/README.md)
+- [Link rules: how each kind of link opens on the TV](https://github.com/yogeshpaliyal/skiff/blob/main/RULES.md)
+- [Privacy policy](https://github.com/yogeshpaliyal/skiff/blob/main/PRIVACY.md): links and history stay on the phone;
+  optional crash reports and usage analytics (Firebase) can be turned off in Settings.
