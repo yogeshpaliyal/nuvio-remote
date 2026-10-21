@@ -49,6 +49,9 @@ import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
@@ -233,7 +236,10 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
     // Paired with this TV: links open over the remote protocol, not ADB (the TV picks the app). Checked again when
     // the remote closes (pairing happens there).
     val paired = remember(host.trim(), showRemote) { hostOk && Atv.isPaired(context, host) }
-    val linkByPairing = linkOk && paired
+    // How links open on a paired TV: pairing (the default; the TV picks the app), or USB debugging (you pick the
+    // app, and the link's rules apply), when the TV has it on.
+    var linkViaAdb by remember { mutableStateOf(prefs.getBoolean("linkViaAdb", false)) }
+    val linkByPairing = linkOk && paired && !linkViaAdb
     val ready = hostOk && (idOk || (linkOk && (linkApps.isNotEmpty() || linkByPairing))) && !busy
     val tvLabel = tvName.ifEmpty { host.trim().ifEmpty { "the TV" } }
 
@@ -379,11 +385,11 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
         page = p
         if (recordLink) library.useLink(l, p, null, played = false)
     }
-    LaunchedEffect(link, host.trim(), shareRun, linkRun, paired) {
+    LaunchedEffect(link, host.trim(), shareRun, linkRun, linkByPairing) {
         linkApps = emptyList()
         val l = link ?: return@LaunchedEffect
         if (host.isBlank()) return@LaunchedEffect
-        if (paired) {
+        if (linkByPairing) {
             // Over pairing: no app to look up, the TV picks it.
             if (openWhenKnown) {
                 openWhenKnown = false
@@ -485,9 +491,9 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
                 hint = when {
                     busy -> null
                     !hostOk -> "Pick a TV above"
-                    linkOk && paired -> null
+                    linkByPairing -> null
                     linkOk && linkAppsLoading -> "Checking which TV app opens it…"
-                    linkOk && linkApps.isEmpty() && !paired -> "No app on $tvLabel opens ${link?.let(Links::site)} links"
+                    linkOk && linkApps.isEmpty() -> "No app on $tvLabel opens ${link?.let(Links::site)} links"
                     !idOk && !linkOk -> "Share a page (IMDb, JioHotstar, YouTube…), or paste its link"
                     else -> null
                 },
@@ -564,7 +570,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
             // MARK: Open with (a link: the TV apps that open it)
             if (hostOk && linkOk) {
                 SectionHeader("Open with") {
-                    if (!linkAppsLoading && !paired) {
+                    if (!linkAppsLoading && !linkByPairing) {
                         TextButton(onClick = { linkRun++ }) {
                             Icon(Icons.Rounded.Refresh, null, Modifier.size(18.dp))
                             Spacer(Modifier.width(6.dp))
@@ -572,7 +578,26 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
                         }
                     }
                 }
+                if (paired) {
+                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                        listOf("Pairing" to false, "USB debugging" to true).forEachIndexed { i, (label, adb) ->
+                            SegmentedButton(
+                                selected = linkViaAdb == adb,
+                                onClick = {
+                                    linkViaAdb = adb
+                                    prefs.edit().putBoolean("linkViaAdb", adb).apply()
+                                },
+                                shape = SegmentedButtonDefaults.itemShape(i, 2),
+                            ) { Text(label) }
+                        }
+                    }
+                }
                 when {
+                    linkByPairing -> NoteCard(
+                        Icons.Rounded.Check,
+                        "Paired with $tvLabel: it opens the link in its app for ${link?.let(Links::site)}.",
+                        error = false,
+                    )
                     linkAppsLoading -> Surface(
                         shape = MaterialTheme.shapes.extraLarge,
                         color = MaterialTheme.colorScheme.surfaceContainer,
@@ -584,14 +609,10 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
                             Text("Checking which app on $tvLabel opens it…", style = MaterialTheme.typography.bodyLarge)
                         }
                     }
-                    paired -> NoteCard(
-                        Icons.Rounded.Check,
-                        "Paired with $tvLabel: it opens the link in its app for ${link?.let(Links::site)}.",
-                        error = false,
-                    )
                     linkApps.isEmpty() -> NoteCard(
                         Icons.Rounded.Warning,
-                        "No app on $tvLabel opens ${link?.let(Links::site)} links. Install its TV app, then try again.",
+                        if (paired) "No app on $tvLabel opens ${link?.let(Links::site)} links over USB debugging (or it's off on the TV). Pairing lets the TV open it."
+                        else "No app on $tvLabel opens ${link?.let(Links::site)} links. Install its TV app, then try again.",
                         error = true,
                     )
                     else -> for (app in linkApps) {
