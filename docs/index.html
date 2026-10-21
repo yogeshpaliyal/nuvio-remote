@@ -13,203 +13,224 @@
 <link rel="icon" href="brand/logo.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,700;12..96,800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&display=swap" rel="stylesheet">
 <style>
   :root {
-    --page: #E8EFEC;      /* sea glass */
+    --sky: #FFCB47;       /* the sail */
+    --sea: #6A3DF0;       /* the icon's violet */
+    --crest: #0FB8A9;     /* the icon's teal */
     --ink: #1B1530;
-    --soft: #4D4860;
-    --rule: #C9D6D1;
-    --bezel: #24212B;
+    --on-sea: #FFFFFF;
+    --on-sea-soft: #D9CFFF;
+    --button: #1B1530;
+    --button-ink: #FFCB47;
+    --bezel: #1B1530;
     --screen: #1D1846;
-    --sail: #FFCB47;
-    --skiff: #5B34E0;
-    --sheet: #FFFFFF;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      --page: #15202A; --ink: #EEF3F1; --soft: #A9B6B2; --rule: #2A3843; --sheet: #1E2A35; --skiff: #A18BFF;
+      --sky: #1B1530; --sea: #3A1FA6; --ink: #FFF1CC; --on-sea-soft: #C5B8F5;
+      --button: #FFCB47; --button-ink: #1B1530; --bezel: #3A3160;
     }
   }
   :root[data-theme="dark"] {
-    --page: #15202A; --ink: #EEF3F1; --soft: #A9B6B2; --rule: #2A3843; --sheet: #1E2A35; --skiff: #A18BFF;
+    --sky: #1B1530; --sea: #3A1FA6; --ink: #FFF1CC; --on-sea-soft: #C5B8F5;
+    --button: #FFCB47; --button-ink: #1B1530; --bezel: #3A3160;
   }
 
   * { box-sizing: border-box; }
+  html { background: var(--sea); }
   body {
-    margin: 0; background: var(--page); color: var(--ink);
+    margin: 0; background: var(--sky); color: var(--ink);
     font-family: "Bricolage Grotesque", system-ui, sans-serif; font-optical-sizing: auto;
-    font-size: 18px; line-height: 1.55;
+    font-size: 18px; line-height: 1.5; overflow-x: hidden;
   }
-  a { color: var(--skiff); text-underline-offset: 3px; }
-  :focus-visible { outline: 3px solid var(--sail); outline-offset: 3px; border-radius: 6px; }
-  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
+  a { color: inherit; text-underline-offset: 3px; }
+  :focus-visible { outline: 3px solid var(--crest); outline-offset: 3px; border-radius: 8px; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
 
-  header.top { display: flex; align-items: center; justify-content: space-between; padding: 24px 0 28px; }
-  .mark { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 22px; color: var(--ink); text-decoration: none; letter-spacing: -0.01em; }
+  header { display: flex; align-items: center; justify-content: space-between; padding: 22px 0; }
+  .mark { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 22px; text-decoration: none; }
   .mark img { width: 34px; height: 34px; }
-  header.top nav { display: flex; gap: 22px; font-weight: 500; }
-  header.top nav a { color: var(--ink); text-decoration: none; }
-  header.top nav a:hover { text-decoration: underline; }
+  header nav a { font-weight: 500; text-decoration: none; }
+  header nav a:hover { text-decoration: underline; }
 
-  /* The TV: the page's one bold thing. */
-  .room { position: relative; }
-  .tv {
-    position: relative; background: var(--bezel); border-radius: 22px; padding: 14px;
-    box-shadow: 0 30px 60px -30px rgba(20, 16, 40, .55), inset 0 0 0 1px rgba(255, 255, 255, .07);
+  h1 {
+    margin: 28px 0 0; max-width: 12ch;
+    font-size: clamp(54px, 9.4vw, 128px); line-height: .9; letter-spacing: -0.035em;
+    font-weight: 800; font-variation-settings: "wdth" 75, "opsz" 96;
   }
-  .screen {
-    position: relative; aspect-ratio: 16 / 8.2; border-radius: 10px; overflow: hidden; color: #F6F3FF;
-    background: radial-gradient(120% 90% at 30% 20%, #2B2466 0%, var(--screen) 55%, #141033 100%);
-    display: flex; flex-direction: column; justify-content: flex-end; padding: clamp(22px, 4.5vw, 56px);
-  }
-  .screen .corner { position: absolute; top: clamp(16px, 2.6vw, 28px); left: clamp(22px, 4.5vw, 56px); right: clamp(22px, 4.5vw, 56px);
-    display: flex; justify-content: space-between; font-size: 15px; color: rgba(246, 243, 255, .62); }
-  .screen h1 {
-    margin: 0; font-weight: 800; font-size: clamp(44px, 8.6vw, 112px); line-height: .94; letter-spacing: -0.04em;
-    font-variation-settings: "opsz" 96;
-  }
-  .screen h1 .sail { display: inline-block; width: .62em; height: .62em; margin-left: .12em; vertical-align: .02em; }
-  .stand { width: 22%; height: 16px; margin: 0 auto; background: var(--bezel); border-radius: 0 0 10px 10px; opacity: .9; }
-
-  /* What the TV shows when something is sent. */
-  .playing { position: absolute; inset: 0; display: grid; place-items: center; background: #0E0B22; opacity: 0; pointer-events: none;
-    transition: opacity .35s ease; }
-  .playing.on { opacity: 1; }
-  .playing .card { text-align: center; padding: 24px; }
-  .playing .app { font-size: clamp(30px, 5vw, 60px); font-weight: 800; letter-spacing: -0.03em; }
-  .playing .what { margin-top: 6px; color: rgba(246, 243, 255, .7); font-size: clamp(15px, 1.8vw, 20px); }
-  .playing .bar { width: min(280px, 60%); height: 4px; margin: 26px auto 0; border-radius: 2px; background: rgba(255,255,255,.14); overflow: hidden; }
-  .playing .bar i { display: block; height: 100%; width: 0; background: var(--sail); }
-  .playing.on .bar i { animation: load 1.6s ease-out forwards; }
-  @keyframes load { to { width: 100%; } }
-
-  /* Switches on once, at load. */
-  .screen .on-air { animation: poweron .9s cubic-bezier(.2, .8, .2, 1) both; }
-  @keyframes poweron { 0% { opacity: 0; transform: scaleY(.02); filter: brightness(3); } 60% { opacity: 1; transform: scaleY(1); filter: brightness(1.4); } 100% { filter: none; } }
-
-  /* The phone's share sheet, under the TV. */
-  .sheet {
-    position: relative;
-    background: var(--sheet); border-radius: 26px; padding: 18px 18px 14px; color: var(--ink);
-    box-shadow: 0 18px 40px -18px rgba(20, 16, 40, .45); border: 1px solid var(--rule);
-  }
-  .sheet p { margin: 2px 4px 12px; font-size: 15px; color: var(--soft); }
-  .sheet ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-  .sheet button {
-    width: 100%; display: flex; align-items: center; gap: 12px; text-align: left; font: inherit; font-size: 16px; color: inherit;
-    background: transparent; border: 0; border-radius: 14px; padding: 10px 10px; cursor: pointer;
-  }
-  .sheet button:hover { background: color-mix(in srgb, var(--skiff) 8%, transparent); }
-  .sheet button[aria-pressed="true"] { background: color-mix(in srgb, var(--sail) 30%, transparent); }
-  .sheet .fav { flex: none; width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; font-weight: 800; font-size: 15px; color: #fff; }
-  .sheet .url { display: block; font-size: 13px; color: var(--soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .sheet .t { display: block; font-weight: 500; }
-
-  /* Under the TV: the pitch on the left, the share sheet (overlapping the TV) on the right. */
-  .under { display: grid; grid-template-columns: 1fr 400px; gap: 48px; align-items: start; margin-top: -46px; padding-bottom: 56px; }
-  .under .sheet { margin: 0; width: 100%; }
-  .pitch { padding-top: 92px; }
-  .pitch .lede { font-size: clamp(26px, 3vw, 36px); line-height: 1.15; letter-spacing: -0.02em; margin: 0 0 28px; font-weight: 700; }
+  .get { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 22px; margin: 34px 0 0; }
   .download {
-    display: inline-block; padding: 16px 26px; border-radius: 14px; background: var(--ink); color: var(--page);
+    display: inline-block; padding: 16px 26px; border-radius: 999px; background: var(--button); color: var(--button-ink);
     font-weight: 700; font-size: 18px; text-decoration: none;
   }
-  .download:hover { background: var(--skiff); color: #fff; }
-  .small { font-size: 15px; color: var(--soft); margin-top: 14px; }
-  .also { list-style: none; margin: 0; padding: 28px 0; display: flex; flex-wrap: wrap; gap: 12px 40px; border-top: 1.5px solid var(--rule);
-    font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
-  .also li::before { content: ""; display: inline-block; width: .5em; height: .5em; margin-right: .5em; vertical-align: .1em;
-    background: var(--sail); clip-path: polygon(0 0, 100% 50%, 0 100%); }
+  .download:hover { background: var(--sea); color: #fff; }
+  .get p { margin: 0; font-size: 16px; max-width: 30ch; line-height: 1.35; }
 
-  footer { padding: 34px 0 56px; border-top: 1.5px solid var(--rule); color: var(--soft); font-size: 15px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px 28px; }
-  footer a { color: var(--soft); }
+  /* The crossing: phone on one shore, TV on the other, the skiff in between.
+     The horizon runs through the bottom of the scene; the sea continues below it. */
+  .crossing { --draft: 34px; /* how far the devices stand in the water */ position: relative; isolation: isolate; margin-top: clamp(40px, 6vw, 72px); }
+  .crossing::after {           /* the sea, from the horizon down */
+    content: ""; position: absolute; left: 50%; width: 100vw; transform: translateX(-50%);
+    top: calc(100% - var(--draft)); bottom: -1px; background: var(--sea); z-index: -1;
+  }
+  .scene {
+    position: relative; display: grid; grid-template-columns: 22% 1fr 52%; align-items: end;
+  }
+  .sea-top { position: absolute; left: 50%; width: 100vw; transform: translateX(-50%); bottom: calc(var(--draft) - 1px); height: 18px; z-index: -1; }
+  .sea-top svg { display: block; width: 100%; height: 100%; }
 
-  @media (max-width: 820px) {
-    .screen { aspect-ratio: 4 / 3.3; }
-    .under { grid-template-columns: 1fr; gap: 36px; margin-top: 18px; }
-    .under .sheet { order: -1; }
-    .pitch { padding-top: 0; }
+  .phone {
+    position: relative; aspect-ratio: 9 / 18.5; background: var(--bezel); border-radius: 13% / 6.4%; padding: 6%;
+    box-shadow: 0 24px 40px -24px rgba(20, 10, 60, .6);
+  }
+  .phone .glass { height: 100%; border-radius: 9% / 4.4%; background: #F7F5FF; overflow: hidden; display: flex; flex-direction: column; container-type: inline-size; }
+  .phone .thumb { aspect-ratio: 16 / 10; background: var(--app, #E2363C); display: grid; place-items: center; transition: background .3s; }
+  .phone .thumb svg { width: 26%; }
+  .phone .line { height: 5cqw; margin: 7cqw 8cqw 0; border-radius: 3cqw; background: #DDD7EE; }
+  .phone .line.short { width: 50%; margin-top: 4cqw; }
+  .phone .share { margin-top: auto; padding: 8cqw 8cqw 10cqw; background: #fff; border-top: 1px solid #ECE8F6; display: flex; justify-content: space-between; }
+  .phone .share i { width: 22cqw; aspect-ratio: 1; border-radius: 28%; background: #E6E1F3; }
+  .phone .share img { width: 22cqw; aspect-ratio: 1; border-radius: 28%; }
+  .phone.tapped .share img { animation: tap .5s ease-out; }
+  @keyframes tap { 40% { transform: scale(.82); } 100% { transform: none; } }
+
+  .water { position: relative; height: 100%; }
+  .skiff {
+    --boat: clamp(34px, 6.6vw, 84px);
+    position: absolute; left: 6%; bottom: calc(var(--draft) * .55); width: var(--boat);
+  }
+  .skiff.docked { left: calc(94% - var(--boat)); }
+  .skiff svg { display: block; width: 100%; }
+  .skiff.go { animation: sail 1.5s cubic-bezier(.45, .05, .35, 1) forwards; }
+  .skiff.go svg { animation: bob .5s ease-in-out 3 alternate; }
+  @keyframes sail { from { left: 6%; } to { left: calc(94% - var(--boat)); } }
+  @keyframes bob { to { transform: translateY(-4px) rotate(-4deg); } }
+
+  .tv { position: relative; }
+  .tv .bezel { background: var(--bezel); border-radius: 14px; padding: 2%; box-shadow: 0 30px 50px -28px rgba(20, 10, 60, .65); }
+  .tv .stand { width: 26%; height: 18px; margin: 0 auto; background: var(--bezel); border-radius: 0 0 8px 8px; }
+  .screen {
+    position: relative; aspect-ratio: 16 / 9; border-radius: 6px; overflow: hidden; container-type: inline-size;
+    background: var(--screen); color: #F6F3FF;
+  }
+  .screen .idle, .screen .open { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; padding: 0 8cqw; transition: opacity .35s; }
+  .screen .idle { color: rgba(246, 243, 255, .55); font-size: max(12px, 3.4cqw); justify-content: space-between; padding: 5cqw 6cqw; flex-direction: row; }
+  .screen .open { background: var(--app, #E2363C); opacity: 0; }
+  .screen.on .open { opacity: 1; }
+  .screen .open b { font-size: 9cqw; line-height: 1; letter-spacing: -0.03em; font-variation-settings: "wdth" 80; }
+  .screen .open span { margin-top: 2.4cqw; font-size: max(12px, 3.6cqw); opacity: .85; }
+  .screen .bar { margin-top: 5cqw; width: 40%; height: max(3px, .8cqw); border-radius: 2px; background: rgba(255, 255, 255, .25); overflow: hidden; }
+  .screen .bar i { display: block; height: 100%; width: 0; background: #fff; }
+  .screen.on .bar i { animation: load 1.8s ease-out forwards; }
+  @keyframes load { to { width: 100%; } }
+
+  /* Below the horizon. */
+  .sea { background: var(--sea); color: var(--on-sea); padding: 30px 0 0; }
+  .try { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  .try span { margin-right: 6px; color: var(--on-sea-soft); }
+  .try button {
+    font: inherit; font-size: 16px; font-weight: 500; color: var(--on-sea); cursor: pointer;
+    background: transparent; border: 1.5px solid rgba(255, 255, 255, .45); border-radius: 999px; padding: 8px 16px;
+  }
+  .try button:hover { border-color: #fff; }
+  .try button[aria-pressed="true"] { background: var(--sky); color: var(--ink); border-color: var(--sky); }
+  :root[data-theme="dark"] .try button[aria-pressed="true"] { background: #FFCB47; color: #1B1530; border-color: #FFCB47; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .try button[aria-pressed="true"] { background: #FFCB47; color: #1B1530; border-color: #FFCB47; } }
+
+  .also { list-style: none; margin: 72px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 44px;
+    font-size: clamp(24px, 3vw, 34px); font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; font-variation-settings: "wdth" 85; }
+
+  footer { margin-top: 64px; padding: 26px 0 44px; border-top: 1.5px solid rgba(255, 255, 255, .22); color: var(--on-sea-soft); font-size: 15px;
+    display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px 28px; }
+  footer nav { display: flex; gap: 24px; }
+
+  @media (max-width: 720px) {
+    .crossing { --draft: 22px; }
+    .tv .bezel { border-radius: 9px; padding: 2.4%; }
+    .tv .stand { height: 12px; }
+    .also { margin-top: 48px; flex-direction: column; }
   }
   @media (max-width: 520px) {
     .wrap { padding: 0 16px; }
-    .tv { padding: 9px; border-radius: 16px; }
-    header.top nav a.wide { display: none; }
+    header nav .wide { display: none; }
   }
   @media (prefers-reduced-motion: reduce) {
-    .screen .on-air, .playing.on .bar i { animation: none; }
-    .playing.on .bar i { width: 100%; }
-    .playing { transition: none; }
+    .skiff.go, .skiff.go svg, .phone.tapped .share img, .screen.on .bar i { animation: none; }
+    .screen.on .bar i { width: 100%; }
+    .screen .open, .phone .thumb { transition: none; }
   }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <header class="top">
+  <header>
     <a class="mark" href="./"><img src="brand/logo.svg" alt="">Skiff</a>
-    <nav>
-      <a href="https://github.com/yogeshpaliyal/skiff">GitHub</a>
-    </nav>
+    <nav><a href="https://github.com/yogeshpaliyal/skiff">Source<span class="wide"> code</span></a></nav>
   </header>
 
-  <div class="room">
-    <div class="tv">
-      <div class="screen">
-        <div class="corner on-air"><span>Living room TV</span><span id="clock">9:41 PM</span></div>
-        <h1 class="on-air">Send it<br>to the TV<svg class="sail" viewBox="0 0 26 26" aria-hidden="true"><path d="M5 2 L5 22 L23 13 Z" fill="#FFCB47" stroke="#FFCB47" stroke-width="3" stroke-linejoin="round"/></svg></h1>
-        <div class="playing" id="playing" aria-live="polite">
-          <div class="card">
-            <div class="app" id="app">YouTube</div>
-            <div class="what" id="what"></div>
-            <div class="bar"><i></i></div>
-          </div>
+  <h1>Share it on your phone. It plays on the TV.</h1>
+
+  <div class="get">
+    <a class="download" href="https://github.com/yogeshpaliyal/skiff/releases/latest">Download the APK</a>
+    <p>Free and open source. Pair once with the code on your TV.</p>
+  </div>
+
+  <div class="crossing">
+    <div class="scene">
+      <div class="sea-top" aria-hidden="true">
+        <svg viewBox="0 0 120 18" preserveAspectRatio="none"><path d="M0 18 V9 Q7.5 0 15 9 T30 9 T45 9 T60 9 T75 9 T90 9 T105 9 T120 9 V18 Z" fill="var(--sea)"/><path d="M0 9 Q7.5 0 15 9 T30 9 T45 9 T60 9 T75 9 T90 9 T105 9 T120 9" fill="none" stroke="var(--crest)" stroke-width="1.6" vector-effect="non-scaling-stroke"/></svg>
+      </div>
+
+      <div class="phone" id="phone" aria-hidden="true">
+        <div class="glass">
+          <div class="thumb"><svg viewBox="0 0 26 26"><path d="M7 4 L7 22 L22 13 Z" fill="#fff"/></svg></div>
+          <div class="line"></div>
+          <div class="line short"></div>
+          <div class="share"><i></i><img src="brand/logo.svg" alt=""><i></i></div>
         </div>
       </div>
-    </div>
-    <div class="stand"></div>
 
-  </div>
+      <div class="water">
+        <div class="skiff" id="skiff" aria-hidden="true">
+          <svg viewBox="24 22 60 64"><path d="M50 27.5 L50 61.5 L75 48.5 Z" fill="#FFCB47" stroke="#1B1530" stroke-width="3" stroke-linejoin="round"/><path d="M29 67.5 H79 L70 80.5 H38 Z" fill="#FFFFFF" stroke="#1B1530" stroke-width="3" stroke-linejoin="round"/></svg>
+        </div>
+      </div>
 
-  <div class="under">
-    <div class="pitch">
-      <p class="lede">Share a link on your phone.<br>It plays on your TV.</p>
-      <a class="download" href="https://github.com/yogeshpaliyal/skiff/releases/latest">Download the APK</a>
-      <p class="small">Pair once with the code on your TV. Free and open source.</p>
-    </div>
-    <div class="sheet">
-      <p>Try it: tap a link to send it</p>
-      <ul>
-        <li><button type="button" data-app="YouTube" data-what="Opening the video">
-          <span class="fav" style="background:#E2363C">▶</span>
-          <span><span class="t">A video you found</span><span class="url">youtube.com/watch?v=…</span></span>
-        </button></li>
-        <li><button type="button" data-app="JioHotstar" data-what="Opening the film">
-          <span class="fav" style="background:#1F3FA8">J</span>
-          <span><span class="t">A film on JioHotstar</span><span class="url">hotstar.com/in/movies/…</span></span>
-        </button></li>
-        <li><button type="button" data-app="Nuvio" data-what="Opening the title">
-          <span class="fav" style="background:#E7B714;color:#1B1530">i</span>
-          <span><span class="t">A series on IMDb</span><span class="url">imdb.com/title/tt…</span></span>
-        </button></li>
-      </ul>
+      <div class="tv">
+        <div class="bezel">
+          <div class="screen" id="screen">
+            <div class="idle"><span>Living room TV</span><span id="clock">9:41 PM</span></div>
+            <div class="open" aria-live="polite"><b id="app">Opening in YouTube</b><span id="what">A video you found</span><div class="bar"><i></i></div></div>
+          </div>
+        </div>
+        <div class="stand"></div>
+      </div>
     </div>
   </div>
-
 </div>
 
-<div class="wrap">
-  <ul class="also">
-    <li>A full remote</li>
-    <li>Type with your phone</li>
-    <li>Volume buttons work</li>
-  </ul>
-</div>
+<div class="sea">
+  <div class="wrap">
+    <div class="try">
+      <span>Send one:</span>
+      <button type="button" data-app="YouTube" data-color="#E2363C" data-what="A video you found">A YouTube video</button>
+      <button type="button" data-app="JioHotstar" data-color="#1F3FA8" data-what="A film from your watchlist">A JioHotstar film</button>
+      <button type="button" data-app="Nuvio" data-color="#C99A06" data-what="A series from IMDb">An IMDb page</button>
+    </div>
 
-<div class="wrap">
-  <footer>
-    <span>Not affiliated with Google or any streaming service.</span>
-    <span><a href="https://github.com/yogeshpaliyal/skiff">Source code</a>&emsp;<a href="https://github.com/yogeshpaliyal/skiff/blob/main/PRIVACY.md">Privacy</a></span>
-  </footer>
+    <ul class="also">
+      <li>A full remote</li>
+      <li>Type with your phone</li>
+      <li>Volume buttons work</li>
+    </ul>
+
+    <footer>
+      <span>Not affiliated with Google or any streaming service.</span>
+      <nav><a href="https://github.com/yogeshpaliyal/skiff">Source code</a><a href="https://github.com/yogeshpaliyal/skiff/blob/main/PRIVACY.md">Privacy</a></nav>
+    </footer>
+  </div>
 </div>
 
 <script>
@@ -219,27 +240,41 @@
       new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   } catch (e) {}
 
-  // The share sheet: tapping a link "sends" it, and the TV shows what opens it.
-  const playing = document.getElementById('playing');
+  // Sending a link: the phone shows it, the skiff carries it across, the TV opens it.
+  const phone = document.getElementById('phone');
+  const skiff = document.getElementById('skiff');
+  const screen = document.getElementById('screen');
   const app = document.getElementById('app');
   const what = document.getElementById('what');
-  const buttons = document.querySelectorAll('.sheet button');
-  let timer;
-  buttons.forEach(b => b.addEventListener('click', () => {
-    buttons.forEach(x => x.setAttribute('aria-pressed', 'false'));
-    b.setAttribute('aria-pressed', 'true');
-    app.textContent = 'Opening in ' + b.dataset.app;
-    what.textContent = b.dataset.what;
-    playing.classList.remove('on');
-    void playing.offsetWidth;   // restart the bar
-    playing.classList.add('on');
-    clearTimeout(timer);
-    timer = setTimeout(() => {
-      playing.classList.remove('on');
-      b.setAttribute('aria-pressed', 'false');
-    }, 4200);
-  }));
-  buttons.forEach(b => b.setAttribute('aria-pressed', 'false'));
+  const buttons = document.querySelectorAll('.try button');
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let timers = [];
+
+  function send(b) {
+    timers.forEach(clearTimeout);
+    buttons.forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    phone.style.setProperty('--app', b.dataset.color);
+    screen.classList.remove('on');
+    phone.classList.remove('tapped'); skiff.classList.remove('go', 'docked');
+    void phone.offsetWidth;   // restart the animations
+    phone.classList.add('tapped'); skiff.classList.add('go');
+    timers = [
+      setTimeout(() => {
+        screen.style.setProperty('--app', b.dataset.color);
+        app.textContent = 'Opening in ' + b.dataset.app;
+        what.textContent = b.dataset.what;
+        screen.classList.add('on');
+        skiff.classList.add('docked');
+      }, still ? 0 : 1500),
+      setTimeout(() => { screen.classList.remove('on'); b.setAttribute('aria-pressed', 'false'); }, 6500)
+    ];
+  }
+  buttons.forEach(b => {
+    b.setAttribute('aria-pressed', 'false');
+    b.addEventListener('click', () => send(b));
+  });
+  // One crossing when the page opens.
+  setTimeout(() => send(buttons[0]), 700);
 </script>
 </body>
 </html>
