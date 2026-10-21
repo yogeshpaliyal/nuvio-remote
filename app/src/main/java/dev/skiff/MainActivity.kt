@@ -230,10 +230,10 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
     val hostOk = host.trim().isNotEmpty()
     val idOk = Title.isImdbId(imdbId)
     val linkOk = link != null
-    // Paired with this TV: links open over the remote protocol when its ADB isn't there (the TV picks the app).
-    // Checked again when the remote closes (pairing happens there).
+    // Paired with this TV: links open over the remote protocol, not ADB (the TV picks the app). Checked again when
+    // the remote closes (pairing happens there).
     val paired = remember(host.trim(), showRemote) { hostOk && Atv.isPaired(context, host) }
-    val linkByPairing = linkOk && linkApps.isEmpty() && !linkAppsLoading && paired
+    val linkByPairing = linkOk && paired
     val ready = hostOk && (idOk || (linkOk && (linkApps.isNotEmpty() || linkByPairing))) && !busy
     val tvLabel = tvName.ifEmpty { host.trim().ifEmpty { "the TV" } }
 
@@ -379,10 +379,18 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
         page = p
         if (recordLink) library.useLink(l, p, null, played = false)
     }
-    LaunchedEffect(link, host.trim(), shareRun, linkRun) {
+    LaunchedEffect(link, host.trim(), shareRun, linkRun, paired) {
         linkApps = emptyList()
         val l = link ?: return@LaunchedEffect
         if (host.isBlank()) return@LaunchedEffect
+        if (paired) {
+            // Over pairing: no app to look up, the TV picks it.
+            if (openWhenKnown) {
+                openWhenKnown = false
+                if (!busy) openLinkOnTv()
+            }
+            return@LaunchedEffect
+        }
         delay(300)
         linkAppsLoading = true
         try {
@@ -390,17 +398,14 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
             linkApps = found
             if (found.none { it.component == linkComponent }) linkComponent = found.firstOrNull()?.component
         } catch (e: Exception) {
-            // Paired: no USB debugging needed, the link goes over the remote protocol.
-            if (!Atv.isPaired(context, host)) {
-                failed = true
-                status = "Couldn't reach $tvLabel: ${e.message ?: e.javaClass.simpleName}"
-            }
+            failed = true
+            status = "Couldn't reach $tvLabel: ${e.message ?: e.javaClass.simpleName}"
         } finally {
             linkAppsLoading = false
         }
         if (openWhenKnown) {
             openWhenKnown = false
-            if ((linkApps.isNotEmpty() || Atv.isPaired(context, host)) && !busy) openLinkOnTv()
+            if (linkApps.isNotEmpty() && !busy) openLinkOnTv()
         }
     }
 
@@ -480,6 +485,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
                 hint = when {
                     busy -> null
                     !hostOk -> "Pick a TV above"
+                    linkOk && paired -> null
                     linkOk && linkAppsLoading -> "Checking which TV app opens it…"
                     linkOk && linkApps.isEmpty() && !paired -> "No app on $tvLabel opens ${link?.let(Links::site)} links"
                     !idOk && !linkOk -> "Share a page (IMDb, JioHotstar, YouTube…), or paste its link"
@@ -558,7 +564,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
             // MARK: Open with (a link: the TV apps that open it)
             if (hostOk && linkOk) {
                 SectionHeader("Open with") {
-                    if (!linkAppsLoading) {
+                    if (!linkAppsLoading && !paired) {
                         TextButton(onClick = { linkRun++ }) {
                             Icon(Icons.Rounded.Refresh, null, Modifier.size(18.dp))
                             Spacer(Modifier.width(6.dp))
@@ -578,7 +584,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
                             Text("Checking which app on $tvLabel opens it…", style = MaterialTheme.typography.bodyLarge)
                         }
                     }
-                    linkApps.isEmpty() && paired -> NoteCard(
+                    paired -> NoteCard(
                         Icons.Rounded.Check,
                         "Paired with $tvLabel: it opens the link in its app for ${link?.let(Links::site)}.",
                         error = false,
