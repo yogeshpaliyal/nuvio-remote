@@ -1,6 +1,8 @@
 package dev.skiff
 
 import android.content.Context
+import android.content.Intent
+import android.os.Build
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.activity.compose.BackHandler
@@ -361,6 +363,21 @@ fun SettingsScreen(host: String, tvName: String, onBack: () -> Unit, startOnActi
                     OutlinedButton(onClick = { Telemetry.testCrash(context) }, enabled = telemetry) { Text("Test crash") }
                 }
             }
+            // MARK: About
+            SectionHeader("About")
+            LinkRow("Report an issue", "On GitHub, with Skiff's version and your phone's model filled in") {
+                openLink(context, issueUrl(context))
+            }
+            LinkRow("Privacy policy", "What Skiff keeps on your phone, and what it sends") {
+                openLink(context, "https://github.com/yogeshpaliyal/skiff/blob/main/PRIVACY.md")
+            }
+            Text(
+                "Skiff ${appVersion(context)} · open source on GitHub",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 4.dp),
+            )
+
             // Debug builds: a made-up TV and history, for store screenshots.
             if (Telemetry.debuggable(context)) {
                 SectionHeader("Demo mode")
@@ -437,6 +454,48 @@ private fun viaHelp(via: Connection.Via, what: String) = when (via) {
 private fun linkHelp(via: Connection.Via) = when (via) {
     Connection.Via.AUTO -> "Automatic: over USB debugging when this phone is allowed (Open with lists the TV's apps), else over pairing."
     else -> viaHelp(via, "")
+}
+
+/** A row that opens something: title, a line about it, and a chevron. */
+@Composable
+private fun LinkRow(title: String, subtitle: String, onClick: () -> Unit) {
+    Card(
+        onClick = onClick,
+        shape = MaterialTheme.shapes.extraLarge,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null)
+        }
+    }
+}
+
+private fun openLink(context: Context, url: String) {
+    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+}
+
+private fun appVersion(context: Context): String = runCatching {
+    val info = context.packageManager.getPackageInfo(context.packageName, 0)
+    "${info.versionName} (${if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else @Suppress("DEPRECATION") info.versionCode.toLong()})"
+}.getOrDefault("?")
+
+/**
+ * A new GitHub issue, its body started: what happened, what was expected, and the details that help (Skiff's
+ * version, Android version, phone model). Nothing about your TVs or history.
+ */
+private fun issueUrl(context: Context): String {
+    val body = buildString {
+        append("**What happened**\n\n\n**What you expected**\n\n\n**Steps to see it**\n1. \n\n---\n")
+        append("Skiff ").append(appVersion(context))
+        append(", Android ").append(Build.VERSION.RELEASE).append(" (API ").append(Build.VERSION.SDK_INT).append(")")
+        append(", ").append(Build.MANUFACTURER).append(' ').append(Build.MODEL)
+    }
+    return "https://github.com/yogeshpaliyal/skiff/issues/new?body=" + Uri.encode(body)
 }
 
 private fun displayName(context: Context, uri: Uri): String? = runCatching {
