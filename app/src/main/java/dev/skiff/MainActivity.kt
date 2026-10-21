@@ -246,6 +246,14 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
         Connection.Via.PAIRING -> true
         Connection.Via.ADB -> false
     }
+    // An IMDb title over pairing: Nuvio's own link (nuvio://movie/tt…) opens its page, the stream picked there. Over
+    // USB debugging it goes straight to the streams (and the episode). The same choice as links; Automatic is USB
+    // debugging when Nuvio answers there, else pairing.
+    val titleByPairing = idOk && !linkOk && when (linkVia) {
+        Connection.Via.AUTO -> paired && apps.isEmpty() && !appsLoading
+        Connection.Via.PAIRING -> true
+        Connection.Via.ADB -> false
+    }
     val ready = hostOk && (idOk || (linkOk && (linkApps.isNotEmpty() || linkByPairing))) && !busy
     val tvLabel = tvName.ifEmpty { host.trim().ifEmpty { "the TV" } }
 
@@ -263,7 +271,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
             if (found.isEmpty()) appsError = "There's no Nuvio app on $tvLabel. Install it from the Play Store or GitHub."
         } catch (e: Exception) {
             appsError = if (Atv.isPaired(context, host)) {
-                "Opening titles in Nuvio needs USB debugging on $tvLabel (links and the remote work paired)."
+                "Nuvio over USB debugging isn't reachable on $tvLabel: Settings → Links → Automatic or Pairing opens titles paired."
             } else {
                 "Couldn't reach $tvLabel: ${e.message ?: e.javaClass.simpleName}"
             }
@@ -301,24 +309,31 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
         if (link != null) return openLinkOnTv()
         busy = true
         failed = false
-        status = "Connecting… The first time, accept “Allow USB debugging?” on the TV (tick Always allow)."
+        val byPairing = titleByPairing
+        val via = if (byPairing) "Pairing" else "USB debugging"
+        status = if (byPairing) "Connecting…" else "Connecting… The first time, accept “Allow USB debugging?” on the TV (tick Always allow)."
         scope.launch {
             try {
                 var n = name.trim()
                 if (n.isEmpty()) {
-                    // Nuvio needs the name for its stream picker.
+                    // Nuvio needs the name for its stream picker (over pairing, only for history).
                     n = Meta.lookup(imdbId)?.name.orEmpty()
-                    if (n.isEmpty()) error("Couldn't find this title's name. Type it in, then try again.")
+                    if (n.isEmpty() && !byPairing) error("Couldn't find this title's name. Type it in, then try again.")
                     name = n
                 }
-                val title = Title(imdbId.trim(), n, series, season, episode)
-                TvLink.open(context, host, title, appComponent)
+                val title = Title(imdbId.trim(), n.ifEmpty { imdbId.trim() }, series, season, episode)
+                if (byPairing) {
+                    Atv.openLink(context, host, "nuvio://${if (series) "series" else "movie"}/${title.imdbId}")
+                } else {
+                    TvLink.open(context, host, title, appComponent)
+                }
                 library.use(title, meta, played = true)
                 prefs.edit().putString("host", host.trim()).putString("tvName", tvName).putString("app", appComponent).apply()
-                status = "Playing “${title.name}”" + (if (series) " S$season E$episode" else "") + " on $tvLabel."
-                ActivityLog.add(context, "Nuvio “${title.name}”", "USB debugging")
+                status = if (byPairing) "Opened “${title.name}” in Nuvio on $tvLabel: pick a stream there."
+                else "Playing “${title.name}”" + (if (series) " S$season E$episode" else "") + " on $tvLabel."
+                ActivityLog.add(context, "Nuvio “${title.name}”", via)
             } catch (e: Exception) {
-                ActivityLog.add(context, "Nuvio “${name.trim().ifEmpty { imdbId }}”", "USB debugging", ok = false)
+                ActivityLog.add(context, "Nuvio “${name.trim().ifEmpty { imdbId }}”", via, ok = false)
                 failed = true
                 status = "Couldn't open it: ${e.message ?: e.javaClass.simpleName}"
             } finally {
@@ -665,6 +680,12 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
                             )
                         }
                     }
+                    titleByPairing -> NoteCard(
+                        Icons.Rounded.Check,
+                        "Paired with $tvLabel: Nuvio opens the title's page, and you pick the stream there" +
+                            (if (series) " (and the episode)" else "") + ". Straight to the streams needs USB debugging.",
+                        error = false,
+                    )
                     appsError != null -> NoteCard(Icons.Rounded.Warning, appsError!!, error = true)
                     else -> for (app in apps) {
                         AppCard(

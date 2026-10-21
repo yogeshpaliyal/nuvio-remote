@@ -203,10 +203,10 @@ fun SettingsScreen(host: String, tvName: String, onBack: () -> Unit) {
                     ViaChoice(remoteVia) { remoteVia = it; Connection.setRemote(context, host, it) }
                     Text(viaHelp(remoteVia, "keys and text"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.size(4.dp))
-                    Text("Links", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                    Text("Links and titles", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                     ViaChoice(linkVia) { linkVia = it; Connection.setLink(context, host, it) }
                     Text(
-                        viaHelp(linkVia, "links") + " Over pairing the TV picks the app; over USB debugging you pick it, and the link's rules apply. Nuvio titles always use USB debugging.",
+                        viaHelp(linkVia, "links") + " Over pairing the TV picks the app, and Nuvio opens a title's page; over USB debugging you pick the app, the link's rules apply, and Nuvio goes straight to the streams.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

@@ -4,7 +4,8 @@ import android.content.Context
 
 /**
  * How each TV is reached, for the remote and for links (Settings): Automatic (paired: the Google TV remote protocol,
- * else the TV's ADB), Pairing only, or USB debugging (ADB) only. Opening titles in Nuvio is always ADB.
+ * else the TV's ADB), Pairing only, or USB debugging (ADB) only. IMDb titles follow the links' choice
+ * (over pairing, Nuvio's own link: nuvio://movie/tt…).
  */
 object Connection {
     enum class Via(val label: String) { AUTO("Automatic"), PAIRING("Pairing"), ADB("USB debugging") }
