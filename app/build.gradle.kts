@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -15,6 +17,8 @@ if (file("google-services.json").exists()) {
 // them is a debug-signed one.
 val keystoreFile = System.getenv("KEYSTORE_FILE")?.let(::file)?.takeIf { it.exists() }
 
+val appVersion = Properties().apply { rootProject.file("version.properties").inputStream().use { load(it) } }
+
 android {
     namespace = "dev.skiff"
     compileSdk = 36
@@ -23,8 +27,9 @@ android {
         applicationId = "dev.skiff"
         minSdk = 26
         targetSdk = 36
-        versionCode = System.getenv("VERSION_CODE")?.toIntOrNull() ?: 1
-        versionName = System.getenv("VERSION_NAME") ?: "1.0.0"
+        // version.properties (the Release workflow raises it); VERSION_CODE / VERSION_NAME override it.
+        versionCode = System.getenv("VERSION_CODE")?.toIntOrNull() ?: appVersion.getProperty("versionCode").toInt()
+        versionName = System.getenv("VERSION_NAME") ?: appVersion.getProperty("versionName")
     }
 
     signingConfigs {

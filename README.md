@@ -101,8 +101,8 @@ Details: [PRIVACY.md](PRIVACY.md).
 ## Download
 
 Get the APK from [Releases](../../releases/latest). Up to 1.2.0 the app was *Nuvio Remote* (`dev.nuvioremote`); Skiff
-(`dev.skiff`) is a new app for Android, so uninstall the old one. Each tag like `v1.2.0` builds one, signed with the same release
-key, so a new version installs over the old one.
+(`dev.skiff`) is a new app for Android, so uninstall the old one. Every release is signed with the same release key,
+so a new version installs over the old one.
 
 ## Build
 
@@ -116,6 +116,9 @@ builds are shrunk with R8 ([proguard-rules.pro](app/proguard-rules.pro)).
 
 Kotlin, Jetpack Compose with Material 3 Expressive and Material You colors, minSdk 26.
 
-A release (`assembleRelease`) is signed when `KEYSTORE_FILE`, `KEYSTORE_PASSWORD` and `KEY_ALIAS` are set, as the
-[release workflow](.github/workflows/release.yml) does from the repo's secrets; `VERSION_NAME` and `VERSION_CODE`
-come from the tag and the run number.
+The version is in [version.properties](version.properties). A release (`assembleRelease`, `bundleRelease`) is signed
+when `KEYSTORE_FILE`, `KEYSTORE_PASSWORD` and `KEY_ALIAS` are set.
+
+**Releasing:** Actions → Release → Run workflow, and pick patch, minor or major. The
+[release workflow](.github/workflows/release.yml) raises the version, builds and signs the APK and app bundle with the
+repo's secrets, and only then commits the new version to `main`, tags it (`v1.9.0`) and publishes the release.

@@ -1,89 +1,108 @@
 name: Release
 
-# A release: the APK (GitHub) and the app bundle (.aab, for Google Play), both signed with the release key (repo
-# secrets), published as a GitHub release. Two ways to start one:
-#  - push a tag like v1.2.0;
-#  - Actions → Release → Run workflow, with a version like 1.2.0: it tags main itself (v1.2.0) and builds that.
+# Actions → Release → Run workflow, picking patch, minor or major:
+#  1. raises the version in version.properties (1.8.0 → 1.8.1, 1.9.0 or 2.0.0; versionCode + 1);
+#  2. builds the APK (GitHub) and the app bundle (.aab, Google Play), signed with the release key (repo secrets);
+#  3. only if that works: commits version.properties to main;
+#  4. tags that commit (v1.9.0) and publishes the release with both files.
 on:
-  push:
-    tags: ["v*"]
   workflow_dispatch:
     inputs:
-      version:
-        description: "Version to release, like 1.9.0 (tags main as v1.9.0)"
+      bump:
+        description: "Which part of the version to raise"
         required: true
-        type: string
+        type: choice
+        options: [patch, minor, major]
+        default: patch
 
 permissions:
   contents: write
+
+# One release at a time: two at once would both raise the same version.
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - name: Pick the version
-        id: version
-        env:
-          INPUT_VERSION: ${{ inputs.version }}
-          REF_NAME: ${{ github.ref_name }}
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            v="${INPUT_VERSION#v}"
-          else
-            v="${REF_NAME#v}"
-          fi
-          if ! echo "$v" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "::error::Version must look like 1.9.0, got '$v'"
-            exit 1
-          fi
-          echo "name=$v" >> "$GITHUB_OUTPUT"
-          echo "tag=v$v" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v4
         with:
-          # A manual run releases main; a tag push, that tag.
-          ref: ${{ github.event_name == 'workflow_dispatch' && 'main' || github.ref }}
-      - name: Tag main
-        if: github.event_name == 'workflow_dispatch'
+          ref: main
+          fetch-depth: 0
+
+      - name: Raise the version
+        id: version
         env:
-          TAG: ${{ steps.version.outputs.tag }}
+          BUMP: ${{ inputs.bump }}
         run: |
-          git fetch --tags --quiet
-          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
-            echo "::error::$TAG already exists: pick a new version"
+          name=$(grep '^versionName=' version.properties | cut -d= -f2)
+          code=$(grep '^versionCode=' version.properties | cut -d= -f2)
+          IFS=. read -r major minor patch <<< "$name"
+          case "$BUMP" in
+            major) major=$((major + 1)); minor=0; patch=0 ;;
+            minor) minor=$((minor + 1)); patch=0 ;;
+            *)     patch=$((patch + 1)) ;;
+          esac
+          next="$major.$minor.$patch"
+          nextCode=$((code + 1))
+          if git rev-parse -q --verify "refs/tags/v$next" >/dev/null; then
+            echo "::error::v$next is already tagged: version.properties is behind the tags"
             exit 1
           fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a "$TAG" -m "Skiff ${TAG#v}"
-          # Pushed with the workflow's own token: that doesn't start this workflow again.
-          git push origin "$TAG"
+          sed -i "s/^versionName=.*/versionName=$next/; s/^versionCode=.*/versionCode=$nextCode/" version.properties
+          echo "Releasing $name → $next (versionCode $code → $nextCode)"
+          echo "name=$next" >> "$GITHUB_OUTPUT"
+          echo "tag=v$next" >> "$GITHUB_OUTPUT"
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
       - uses: gradle/actions/setup-gradle@v4
+
       - name: Decode the release key
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
+
       - name: Build the signed APK and app bundle
         env:
           KEYSTORE_FILE: ${{ runner.temp }}/release.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           VERSION_NAME: ${{ steps.version.outputs.name }}
-          VERSION_CODE: ${{ github.run_number }}
         run: |
           ./gradlew assembleRelease bundleRelease
           cp app/build/outputs/apk/release/app-release.apk "skiff-${VERSION_NAME}.apk"
           cp app/build/outputs/bundle/release/app-release.aab "skiff-${VERSION_NAME}.aab"
+
       - name: Check the signatures
         run: |
           "$ANDROID_HOME"/build-tools/$(ls "$ANDROID_HOME"/build-tools | sort -V | tail -1)/apksigner verify --print-certs skiff-*.apk | head -3
           jarsigner -verify skiff-*.aab | grep 'jar verified'     # fails the job when the bundle isn't signed
+
+      # Only after a good build: the new version goes to main, tagged.
+      - name: Commit the version to main and tag it
+        env:
+          NAME: ${{ steps.version.outputs.name }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add version.properties
+          git commit -m "Release $NAME"
+          # main may have moved while this built: put the version commit on top of it.
+          git pull --rebase origin main
+          git push origin HEAD:main
+          git tag -a "$TAG" -m "Skiff $NAME"
+          git push origin "$TAG"
+
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
+          name: Skiff ${{ steps.version.outputs.name }}
           files: |
             skiff-*.apk
             skiff-*.aab
