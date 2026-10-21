@@ -109,6 +109,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        Telemetry.init(this)
         Rules.init(this)
         shared = sharedTitle(intent)
         setContent {
@@ -293,8 +294,10 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
                 prefs.edit().putString("host", host.trim()).putString("tvName", tvName).putString("linkApp", linkComponent).apply()
                 status = "Opened “${p.title}”" + (app?.let { " in $it" } ?: "") + " on $tvLabel."
                 ActivityLog.add(context, "Link ${Links.site(l)}" + (app?.let { " → $it" } ?: ""), if (byPairing) "Pairing" else "USB debugging")
+                Telemetry.event(context, "open_link", "site" to Links.site(l), "via" to (if (byPairing) "pairing" else "adb"), "ok" to true)
             } catch (e: Exception) {
                 ActivityLog.add(context, "Link ${Links.site(l)}", if (byPairing) "Pairing" else "USB debugging", ok = false)
+                Telemetry.event(context, "open_link", "site" to Links.site(l), "via" to (if (byPairing) "pairing" else "adb"), "ok" to false)
                 failed = true
                 status = "Couldn't open it: ${e.message ?: e.javaClass.simpleName}"
             } finally {
@@ -330,8 +333,10 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
                 status = if (byPairing) "Opened “${title.name}” in Nuvio on $tvLabel: pick a stream there."
                 else "Playing “${title.name}”" + (if (series) " S$season E$episode" else "") + " on $tvLabel."
                 ActivityLog.add(context, "Nuvio “${title.name}”", via)
+                Telemetry.event(context, "play_title", "via" to (if (byPairing) "pairing" else "adb"), "series" to series, "ok" to true)
             } catch (e: Exception) {
                 ActivityLog.add(context, "Nuvio “${name.trim().ifEmpty { imdbId }}”", via, ok = false)
+                Telemetry.event(context, "play_title", "via" to (if (byPairing) "pairing" else "adb"), "series" to series, "ok" to false)
                 failed = true
                 status = "Couldn't open it: ${e.message ?: e.javaClass.simpleName}"
             } finally {
@@ -472,6 +477,9 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
         }
     }
 
+    LaunchedEffect(showLibrary, showRemote, showSettings) {
+        Telemetry.screen(context, when { showLibrary -> "library"; showRemote -> "remote"; showSettings -> "settings"; else -> "send" })
+    }
     BackHandler(enabled = showLibrary || showRemote || showSettings) { showLibrary = false; showRemote = false; showSettings = false }
     // 0: send, 1: library, 2: remote
     AnimatedContent(targetState = if (showLibrary) 1 else if (showRemote) 2 else if (showSettings) 3 else 0, label = "screen") { screen ->

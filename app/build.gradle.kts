@@ -4,6 +4,13 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+// Firebase (Crashlytics, Analytics) needs the project's app/google-services.json (from the Firebase console, or a CI
+// secret): without it the app builds and runs, and reports nothing.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+    apply(plugin = "com.google.firebase.crashlytics")
+}
+
 // CI (the release workflow) passes the release key and the version through the environment; a local build without
 // them is a debug-signed one.
 val keystoreFile = System.getenv("KEYSTORE_FILE")?.let(::file)?.takeIf { it.exists() }
@@ -66,5 +73,9 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     // Talks ADB to the TV over Wi-Fi, from the phone (the same "am start" you'd run from a computer).
     implementation("dev.mobile:dadb:1.2.10")
+    // Crash reports and usage (Settings can turn them off).
+    implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
+    implementation("com.google.firebase:firebase-crashlytics")
+    implementation("com.google.firebase:firebase-analytics")
     testImplementation("junit:junit:4.13.2")
 }

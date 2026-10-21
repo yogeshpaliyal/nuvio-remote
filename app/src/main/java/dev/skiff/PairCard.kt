@@ -74,6 +74,7 @@ fun PairCard(host: String, onPaired: () -> Unit, modifier: Modifier = Modifier, 
                         pairing = null
                         note = null
                         ActivityLog.add(context, "Paired with ${host.trim()}", "Pairing")
+                        Telemetry.event(context, "pair")
                         onPaired()
                     }
                     Atv.Pairing.Result.MISTYPED -> note = "That code doesn't match: check it on the TV."

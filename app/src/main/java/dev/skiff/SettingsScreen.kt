@@ -47,6 +47,7 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SuggestionChip
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -126,10 +127,12 @@ fun SettingsScreen(host: String, tvName: String, onBack: () -> Unit) {
                 output = r.allOutput.trimEnd().ifEmpty { "(no output, exit ${r.exitCode})" } +
                     if (r.exitCode != 0 && r.allOutput.isNotBlank()) "\n(exit ${r.exitCode})" else ""
                 ActivityLog.add(context, "Command: $c", "USB debugging", ok = r.exitCode == 0)
+                Telemetry.event(context, "adb_command", "ok" to (r.exitCode == 0))
             } catch (e: Exception) {
                 outputFailed = true
                 output = "Couldn't reach $tvLabel: ${e.message ?: e.javaClass.simpleName}"
                 ActivityLog.add(context, "Command: $c", "USB debugging", ok = false)
+                Telemetry.event(context, "adb_command", "ok" to false)
             } finally {
                 running = false
                 recent = rememberCommand(context, c)
@@ -152,10 +155,12 @@ fun SettingsScreen(host: String, tvName: String, onBack: () -> Unit) {
                 TvLink.install(context, host, apk)
                 installNote = "Installed $name on $tvLabel."
                 ActivityLog.add(context, "Installed $name", "USB debugging")
+                Telemetry.event(context, "apk_install", "ok" to true)
             } catch (e: Exception) {
                 installFailed = true
                 installNote = "Couldn't install $name: ${e.message ?: e.javaClass.simpleName}"
                 ActivityLog.add(context, "Install $name", "USB debugging", ok = false)
+                Telemetry.event(context, "apk_install", "ok" to false)
             } finally {
                 withContext(Dispatchers.IO) { apk.delete() }
                 installing = false
@@ -230,6 +235,7 @@ fun SettingsScreen(host: String, tvName: String, onBack: () -> Unit) {
                                 Atv.forget(context, host)
                                 paired = false
                                 ActivityLog.add(context, "Forgot the pairing with $tvLabel", "Pairing")
+                                Telemetry.event(context, "forget_pairing")
                             }) { Text("Forget pairing") }
                         }
                         if (!pairOpen) Button(onClick = { pairOpen = true }) { Text(if (paired) "Pair again" else "Pair") }
@@ -334,6 +340,23 @@ fun SettingsScreen(host: String, tvName: String, onBack: () -> Unit) {
                 }
             }
 
+            // MARK: Privacy
+            SectionHeader("Privacy")
+            var telemetry by remember { mutableStateOf(Telemetry.enabled(context)) }
+            Panel {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Share crash reports and usage", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "Crashes, and which features are used and how (USB debugging or pairing), through Firebase. Never what you watch.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Switch(checked = telemetry, onCheckedChange = { telemetry = it; Telemetry.setEnabled(context, it) })
+                }
+            }
             Spacer(Modifier.size(24.dp))
         }
     }

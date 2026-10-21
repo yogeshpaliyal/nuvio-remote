@@ -121,6 +121,7 @@ fun RemoteScreen(host: String, tvName: String, onBack: () -> Unit) {
             via = "USB debugging"
             error = null
             ActivityLog.add(context, "Remote connected", via)
+            Telemetry.event(context, "remote_connect", "via" to (if (via == "Pairing") "pairing" else "adb"))
             true
         } catch (e: Exception) {
             error = "Couldn't reach $name over USB debugging: ${e.message ?: e.javaClass.simpleName}"
@@ -131,6 +132,7 @@ fun RemoteScreen(host: String, tvName: String, onBack: () -> Unit) {
             via = "Pairing"
             error = null
             ActivityLog.add(context, "Remote connected", via)
+            Telemetry.event(context, "remote_connect", "via" to (if (via == "Pairing") "pairing" else "adb"))
             true
         } catch (e: Exception) {
             error = e.message ?: "Pair with $name to use the remote."

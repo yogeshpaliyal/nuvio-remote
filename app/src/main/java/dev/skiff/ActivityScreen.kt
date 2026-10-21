@@ -26,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,6 +41,7 @@ import androidx.compose.ui.unit.dp
 fun ActivityScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val entries = ActivityLog.entries(context)
+    LaunchedEffect(Unit) { Telemetry.screen(context, "activity") }
     Scaffold(
         topBar = {
             TopAppBar(
