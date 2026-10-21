@@ -47,6 +47,17 @@ class MessagesTest {
         assertArrayEquals(hex("520408131003"), Messages.keyInject(19))
     }
 
+    @Test fun shiftHeldBytes() {
+        // remote_key_inject { key_code: 59 (SHIFT_LEFT), direction: START_LONG = 1 }
+        assertArrayEquals(hex("5204083b1001"), Messages.keyInject(59, Messages.DIRECTION_DOWN))
+    }
+
+    @Test fun readsTheFocusedFieldCounter() {
+        // RemoteMessage { remote_ime_show_request (22) { remote_text_field_status (2) { counter_field (1): 5 } } }
+        val show = ProtoWriter().message(22) { message(2) { varint(1, 5) } }.toByteArray()
+        assertEquals(5, Messages.Remote(show).imeFieldCounter)
+    }
+
     @Test fun appLinkBytes() {
         // RemoteMessage { remote_app_link_launch_request (90) { app_link (1): "x" } }: tag 90<<3|2 = 722 = D2 05
         assertArrayEquals(hex("d205030a0178"), Messages.appLink("x"))

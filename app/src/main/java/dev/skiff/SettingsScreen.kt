@@ -3,7 +3,7 @@ package dev.skiff
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
-import android.text.format.DateUtils
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -29,8 +29,11 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -65,6 +68,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.skiff.atv.Atv
 import kotlinx.coroutines.Dispatchers
@@ -77,7 +81,7 @@ import java.io.File
  *  - Connection: paired or not, whether its ADB answers, and how the remote and links reach it (Automatic, Pairing,
  *    USB debugging); forget or redo the pairing;
  *  - ADB tools (USB debugging): a shell command, an APK from the phone installed on the TV;
- *  - Activity: what was sent to the TV, and how.
+ *  - Activity (its own screen): what was sent to the TV, and how.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -159,6 +163,13 @@ fun SettingsScreen(host: String, tvName: String, onBack: () -> Unit) {
         }
     }
 
+    var showActivity by remember { mutableStateOf(false) }
+    if (showActivity) {
+        BackHandler { showActivity = false }
+        ActivityScreen(onBack = { showActivity = false })
+        return
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -172,6 +183,29 @@ fun SettingsScreen(host: String, tvName: String, onBack: () -> Unit) {
                 .padding(horizontal = 20.dp).navigationBarsPadding(),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            // MARK: Activity (its own screen)
+            val entries = ActivityLog.entries(context)
+            Card(
+                onClick = { showActivity = true },
+                shape = MaterialTheme.shapes.extraLarge,
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            ) {
+                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Activity", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            entries.firstOrNull()?.let { "Last: ${it.what} · ${it.via}" } ?: "What Skiff sends to the TV, and how",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null)
+                }
+            }
+
             // MARK: Connection
             SectionHeader(if (hostOk) "Connection · $tvLabel" else "Connection")
             if (!hostOk) {
@@ -300,41 +334,6 @@ fun SettingsScreen(host: String, tvName: String, onBack: () -> Unit) {
                 }
             }
 
-            // MARK: Activity
-            val entries = ActivityLog.entries(context)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.weight(1f)) { SectionHeader("Activity") }
-                if (entries.isNotEmpty()) TextButton(onClick = { ActivityLog.clear(context) }) { Text("Clear") }
-            }
-            if (entries.isEmpty()) {
-                Text(
-                    "What Skiff sends to the TV shows here, with how it went: Pairing or USB debugging.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else {
-                Panel {
-                    for (e in entries) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                Modifier.size(8.dp).clip(CircleShape)
-                                    .background(if (e.ok) Color(0xFF3DDC84) else MaterialTheme.colorScheme.error),
-                            )
-                            Spacer(Modifier.width(12.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text(e.what, style = MaterialTheme.typography.bodyMedium, maxLines = 2)
-                                Text(
-                                    e.via + (if (e.ok) "" else " · failed") + " · " + DateUtils.formatDateTime(
-                                        context, e.time, DateUtils.FORMAT_SHOW_TIME or DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_ABBREV_MONTH,
-                                    ),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                    }
-                }
-            }
             Spacer(Modifier.size(24.dp))
         }
     }

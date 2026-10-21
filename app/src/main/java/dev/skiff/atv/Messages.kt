@@ -91,7 +91,10 @@ object Messages {
     const val FEATURE_APP_LINK = 512
     const val FEATURES = FEATURE_PING or FEATURE_KEY or FEATURE_IME or FEATURE_POWER or FEATURE_VOLUME or FEATURE_APP_LINK
 
-    private const val DIRECTION_SHORT = 3
+    // Key directions: a press, or held down (a modifier: Shift) and let go.
+    const val DIRECTION_DOWN = 1
+    const val DIRECTION_UP = 2
+    const val DIRECTION_SHORT = 3
 
     /** Our RemoteConfigure: the features we use (those the TV supports), and who we are (as androidtvremote2 sends it). */
     fun remoteConfigure(features: Int) = ProtoWriter().message(1) {
@@ -109,12 +112,13 @@ object Messages {
     fun pingResponse(val1: Int) = ProtoWriter().message(9) { varint(1, val1) }.toByteArray()
 
     /** A key press: the key codes are Android's own (KeyEvent.KEYCODE_*). */
-    fun keyInject(keyCode: Int) = ProtoWriter().message(10) { varint(1, keyCode); varint(2, DIRECTION_SHORT) }.toByteArray()
+    fun keyInject(keyCode: Int, direction: Int = DIRECTION_SHORT) =
+        ProtoWriter().message(10) { varint(1, keyCode); varint(2, direction) }.toByteArray()
 
     /** Opens a link on the TV, in the app that opens it (an app's own link, a web link, market://launch?id=…). */
     fun appLink(link: String) = ProtoWriter().message(90) { string(1, link) }.toByteArray()
 
-    /** Text into the TV's focused field (it sent its counters when the field got focus). */
+    /** Text into the TV's focused field, by its input method (it sent its counters when the field got focus). */
     fun imeText(imeCounter: Int, fieldCounter: Int, text: String) = ProtoWriter().message(21) {
         varint(1, imeCounter)
         varint(2, fieldCounter)
@@ -132,6 +136,9 @@ object Messages {
         val error = r.has(3)
         val pingVal1: Int? = r.message(8)?.int(1)
         val imeBatchEdit = r.message(21)
+        /** The focused text field's counter, as the TV announces it (key inject 20, show request 22). */
+        val imeFieldCounter: Int? = (r.message(20) ?: r.message(22))?.message(2)?.takeIf { it.has(1) }?.int(1)
         val start = r.message(40)
+        val fields = r.fields
     }
 }

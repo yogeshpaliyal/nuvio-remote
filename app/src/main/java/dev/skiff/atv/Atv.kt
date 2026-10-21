@@ -5,6 +5,9 @@ import android.content.Context
 import android.os.Build
 import dev.skiff.TvKeys
 import android.security.keystore.KeyGenParameterSpec
+import android.util.Log
+import android.view.KeyCharacterMap
+import android.view.KeyEvent
 import android.security.keystore.KeyProperties
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -117,6 +120,7 @@ object Atv {
         private val started = CompletableDeferred<Unit>()
         @Volatile private var imeCounter = 0
         @Volatile private var fieldCounter = 0
+        @Volatile private var features = Messages.FEATURES
         @Volatile var closed = false
             private set
 
@@ -125,14 +129,19 @@ object Atv {
                 try {
                     while (true) {
                         val m = Messages.Remote(ProtoReader.readFrame(socket.inputStream))
+                        if (m.pingVal1 == null) Log.d("Skiff", "TV sent RemoteMessage fields ${m.fields}")
                         when {
-                            m.configure != null -> send(Messages.remoteConfigure(Messages.FEATURES and m.configure.int(1)))
-                            m.setActive -> send(Messages.remoteSetActive(Messages.FEATURES))
+                            m.configure != null -> {
+                                features = Messages.FEATURES and m.configure.int(1)
+                                send(Messages.remoteConfigure(features))
+                            }
+                            m.setActive -> send(Messages.remoteSetActive(features))
                             m.pingVal1 != null -> send(Messages.pingResponse(m.pingVal1))
                             m.imeBatchEdit != null -> {
                                 imeCounter = m.imeBatchEdit.int(1)
                                 fieldCounter = m.imeBatchEdit.int(2)
                             }
+                            m.imeFieldCounter != null -> fieldCounter = m.imeFieldCounter
                             m.start != null -> started.complete(Unit)
                         }
                     }
@@ -148,9 +157,27 @@ object Atv {
         /** A key (KeyEvent.KEYCODE_*: the protocol uses Android's codes). */
         override suspend fun key(code: Int) = send(Messages.keyInject(code))
 
-        /** Text into the TV's focused field. */
+        /**
+         * Text into the TV's focused field, typed as key presses (Shift held for capitals and symbols): the TV takes
+         * them in any field. Its input method's edit (below) needs counters some TVs never send: only for what a
+         * keyboard can't type (emoji, other scripts).
+         */
         override suspend fun text(s: String) {
-            if (s.isNotEmpty()) send(Messages.imeText(imeCounter, fieldCounter, s))
+            if (s.isEmpty()) return
+            val events = KeyCharacterMap.load(KeyCharacterMap.VIRTUAL_KEYBOARD).getEvents(s.toCharArray())
+            if (events == null) {
+                send(Messages.imeText(imeCounter, fieldCounter, s))
+                return
+            }
+            for (e in events) {
+                val modifier = KeyEvent.isModifierKey(e.keyCode)
+                when {
+                    modifier -> send(Messages.keyInject(
+                        e.keyCode, if (e.action == KeyEvent.ACTION_DOWN) Messages.DIRECTION_DOWN else Messages.DIRECTION_UP,
+                    ))
+                    e.action == KeyEvent.ACTION_DOWN -> send(Messages.keyInject(e.keyCode))
+                }
+            }
         }
 
         /** Opens a link on the TV (an app's own link, a web link…), in the app the TV picks for it. */

@@ -510,7 +510,6 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
                     )
                 },
                 actions = {
-                    IconButton(onClick = { showRemote = true }, enabled = hostOk) { Icon(AppIcons.Remote, "Remote") }
                     IconButton(onClick = { showLibrary = true }) { Icon(AppIcons.History, "History and saved") }
                     IconButton(onClick = { showSettings = true }) { Icon(Icons.Rounded.Settings, "Settings") }
                 },
@@ -532,6 +531,8 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
                     else -> null
                 },
                 onClick = { openOnTv() },
+                remoteEnabled = hostOk,
+                onRemote = { showRemote = true },
             )
         },
     ) { inner ->
@@ -1066,27 +1067,41 @@ private fun NoteCard(icon: ImageVector, text: String, error: Boolean) {
 /** The one action, always at hand: a large expressive button (its shape morphs when pressed). */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun PlayBar(label: String, enabled: Boolean, busy: Boolean, hint: String?, onClick: () -> Unit) {
+private fun PlayBar(
+    label: String,
+    enabled: Boolean,
+    busy: Boolean,
+    hint: String?,
+    onClick: () -> Unit,
+    remoteEnabled: Boolean,
+    onRemote: () -> Unit,
+) {
     Surface(color = MaterialTheme.colorScheme.surfaceContainer, tonalElevation = 3.dp) {
         Column(
             Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             val height = ButtonDefaults.LargeContainerHeight
-            Button(
-                onClick = onClick,
-                enabled = enabled,
-                shapes = ButtonDefaults.shapes(),
-                contentPadding = ButtonDefaults.contentPaddingFor(height),
-                modifier = Modifier.fillMaxWidth().heightIn(min = height),
-            ) {
-                if (busy) {
-                    LoadingIndicator(Modifier.size(ButtonDefaults.iconSizeFor(height)), color = MaterialTheme.colorScheme.onPrimary)
-                } else {
-                    Icon(Icons.Rounded.PlayArrow, null, Modifier.size(ButtonDefaults.iconSizeFor(height)))
+            // The remote beside Play: the two things done with the TV.
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                FilledTonalIconButton(onClick = onRemote, enabled = remoteEnabled, modifier = Modifier.size(height)) {
+                    Icon(AppIcons.Remote, "Remote", Modifier.size(ButtonDefaults.iconSizeFor(height)))
                 }
-                Spacer(Modifier.width(ButtonDefaults.iconSpacingFor(height)))
-                Text(label, style = ButtonDefaults.textStyleFor(height), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Button(
+                    onClick = onClick,
+                    enabled = enabled,
+                    shapes = ButtonDefaults.shapes(),
+                    contentPadding = ButtonDefaults.contentPaddingFor(height),
+                    modifier = Modifier.weight(1f).heightIn(min = height),
+                ) {
+                    if (busy) {
+                        LoadingIndicator(Modifier.size(ButtonDefaults.iconSizeFor(height)), color = MaterialTheme.colorScheme.onPrimary)
+                    } else {
+                        Icon(Icons.Rounded.PlayArrow, null, Modifier.size(ButtonDefaults.iconSizeFor(height)))
+                    }
+                    Spacer(Modifier.width(ButtonDefaults.iconSpacingFor(height)))
+                    Text(label, style = ButtonDefaults.textStyleFor(height), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
             }
             if (hint != null) {
                 Text(

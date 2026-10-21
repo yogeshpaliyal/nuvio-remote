@@ -100,6 +100,7 @@ class ProtoReader(bytes: ByteArray) {
     }
 
     fun has(field: Int) = field in varints || field in blobs
+    val fields: Set<Int> get() = varints.keys + blobs.keys
     fun int(field: Int): Int = (varints[field] ?: 0L).toInt()
     fun bool(field: Int): Boolean = (varints[field] ?: 0L) != 0L
     fun string(field: Int): String = blobs[field]?.toString(Charsets.UTF_8).orEmpty()
