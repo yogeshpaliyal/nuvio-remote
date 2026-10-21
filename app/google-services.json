@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "567017856849",
+    "project_id": "skiff-send-to-tv",
+    "storage_bucket": "skiff-send-to-tv.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:567017856849:android:410e43b5bdd16b062bbd70",
+        "android_client_info": {
+          "package_name": "dev.skiff"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCoaedjBYsNFmfA--9dZ0wPwD0MHIyZD5Q"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
