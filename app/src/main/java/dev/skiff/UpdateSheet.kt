@@ -12,11 +12,16 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -27,7 +32,9 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun UpdateSheet(r: Updates.Release, onDismiss: () -> Unit) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val fromPlay = Updates.viaPlay
+    val progress by Updates.progress.collectAsState()
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(if (r.version.isNotBlank()) "Skiff ${r.version}" else "A new Skiff", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
@@ -45,14 +52,35 @@ fun UpdateSheet(r: Updates.Release, onDismiss: () -> Unit) {
             }
             Text(
                 if (fromPlay) "Google Play downloads it while you use Skiff, then Skiff restarts into it. Your history stays."
-                else "Downloads the APK in your browser: open it to install. Your history stays.",
+                else "Skiff downloads it, then Android asks you to update. Your history stays.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            // Getting it: the download's progress, installing, or what went wrong.
+            when (val p = progress) {
+                is Updates.Progress.Downloading -> Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (p.fraction != null) LinearProgressIndicator(progress = { p.fraction }, modifier = Modifier.fillMaxWidth())
+                    else LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    Text(
+                        "Downloading" + (p.fraction?.let { " ${(it * 100).toInt()}%" } ?: "…"),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                Updates.Progress.Installing -> Text("Installing: confirm on the screen Android shows.", style = MaterialTheme.typography.bodySmall)
+                is Updates.Progress.Problem -> Text(p.message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                null -> {}
+            }
+            val busy = progress is Updates.Progress.Downloading || progress == Updates.Progress.Installing
             Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
-                TextButton(onClick = { Updates.later(context, r); onDismiss() }) { Text("Later") }
+                TextButton(onClick = { Updates.later(context, r); onDismiss() }, enabled = !busy) { Text("Later") }
                 Spacer(Modifier.width(8.dp))
-                Button(onClick = { Updates.open(context, r); onDismiss() }) { Text("Update") }
+                Button(
+                    onClick = {
+                        scope.launch { Updates.open(context, r) }
+                        if (fromPlay) onDismiss()
+                    },
+                    enabled = !busy,
+                ) { Text(if (progress is Updates.Progress.Problem) "Try again" else "Update") }
             }
         }
     }

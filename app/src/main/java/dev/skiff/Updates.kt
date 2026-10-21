@@ -66,6 +66,17 @@ object Updates {
         return newer
     }
 
-    /** Gets the update: the store's way (Play's in-app update, or the APK in the browser). */
-    fun open(context: Context, r: Release) = StoreUpdates.open(context, r)
+    /** How getting the update goes: a download's progress (0–1), installing, or what went wrong. */
+    sealed interface Progress {
+        data class Downloading(val fraction: Float?) : Progress
+        data object Installing : Progress
+        data class Problem(val message: String) : Progress
+    }
+
+    internal val progressState = MutableStateFlow<Progress?>(null)
+    /** Getting the update, while it's under way (null otherwise). */
+    val progress: StateFlow<Progress?> = progressState
+
+    /** Gets the update, the store's way: Play's in-app update, or the APK downloaded and installed by Skiff. */
+    suspend fun open(context: Context, r: Release) = StoreUpdates.open(context, r)
 }

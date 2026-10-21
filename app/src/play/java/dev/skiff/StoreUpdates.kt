@@ -38,7 +38,7 @@ internal object StoreUpdates {
         return Updates.Release(version = "", notes = "", apkUrl = null, pageUrl = PAGE, id = "code:${i.availableVersionCode()}")
     }
 
-    fun open(context: Context, r: Updates.Release) {
+    suspend fun open(context: Context, r: Updates.Release) {
         val manager = AppUpdateManagerFactory.create(context)
         val i = info
         val activity = context.activity()

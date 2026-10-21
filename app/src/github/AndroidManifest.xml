@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The github build only: it downloads its own updates and installs them (the play build updates through Play). -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+    <application>
+        <!-- Android's answers about an update being installed: asks you to confirm, or says how it went. -->
+        <receiver android:name=".InstallReceiver" android:exported="false" />
+    </application>
+</manifest>
