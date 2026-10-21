@@ -5,6 +5,12 @@ Open a movie or episode in [Nuvio](https://github.com/NuvioMedia/NuvioTV) on you
 Share an IMDb page to Nuvio Remote (from Chrome or the IMDb app), and Nuvio on the TV opens that title's stream
 picker. Movies open right away; for a series, pick the season and episode, then **Open on TV**.
 
+## History and Saved for later
+
+Every title you share, paste or play goes to **History** (newest first, with its episode and when), and the bookmark
+saves one **for later**. Tap one to load it, ▶ to play it on the TV; ⋮ edits it (name, movie or series, episode) or
+removes it, and so does a swipe, with Undo. Kept on the phone (`files/library.json`).
+
 ## How it works
 
 - **Finding the TV.** Google TVs announce themselves on the Wi-Fi (mDNS): `_androidtvremote2._tcp` gives the TV's

@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedContent
@@ -51,6 +52,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialExpressiveTheme
@@ -72,6 +74,7 @@ import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -146,6 +149,10 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences(PREFS, Context.MODE_PRIVATE) }
     val scope = rememberCoroutineScope()
+    // History and Saved for later.
+    val library = remember { Library.get(context) }
+    val entries by library.entries.collectAsState()
+    var showLibrary by remember { mutableStateOf(false) }
     @Suppress("DEPRECATION") val clipboard = LocalClipboardManager.current
 
     // The TV
@@ -200,6 +207,8 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
     // Shared a page: open it on the TV as soon as it's known to be a movie (a series waits for its episode).
     var openWhenKnown by remember { mutableStateOf(false) }
     var shareRun by remember { mutableIntStateOf(0) }     // the same page shared again looks it up again
+    // Movie or series set by you (the toggle, or an entry you edited): the lookup doesn't change it back.
+    var keepType by remember { mutableStateOf(false) }
 
     val hostOk = host.trim().isNotEmpty()
     val idOk = Title.isImdbId(imdbId)
@@ -240,6 +249,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
                 }
                 val title = Title(imdbId.trim(), n, series, season, episode)
                 TvLink.open(context, host, title, appComponent)
+                library.use(title, meta, played = true)
                 prefs.edit().putString("host", host.trim()).putString("tvName", tvName).putString("app", appComponent).apply()
                 status = "Playing “${title.name}”" + (if (series) " S$season E$episode" else "") + " on $tvLabel."
             } catch (e: Exception) {
@@ -251,6 +261,24 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
         }
     }
 
+    /** An entry from the library back in the remote, as it was used (or edited); `play`: straight to the TV. */
+    fun pick(e: Library.Entry, play: Boolean) {
+        showLibrary = false
+        imdbId = e.imdbId
+        name = e.name
+        autoName = false
+        series = e.series
+        keepType = true
+        season = e.season
+        episode = e.episode
+        editName = false
+        failed = false
+        status = null
+        if (play) {
+            if (hostOk && !busy) openOnTv() else status = "Pick your TV, then play it."
+        }
+    }
+
     // A shared IMDb page fills in the id (and the title, when the share says it).
     if (shared != null) {
         imdbId = shared.imdbId
@@ -259,6 +287,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
             autoName = true
         }
         shared.series?.let { series = it }
+        keepType = false
         status = null
         failed = false
         openWhenKnown = true
@@ -288,7 +317,8 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
             name = found.name
             autoName = true
         }
-        series = found.series
+        if (!keepType) series = found.series
+        library.use(Title(imdbId, name, series, season, episode), found, played = false)
         if (openWhenKnown) {
             openWhenKnown = false
             when {
@@ -299,6 +329,12 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
         }
     }
 
+    BackHandler(enabled = showLibrary) { showLibrary = false }
+    AnimatedContent(targetState = showLibrary, label = "screen") { libraryShown ->
+    if (libraryShown) {
+        LibraryScreen(library, onBack = { showLibrary = false }, onOpen = { pick(it, false) }, onPlay = { pick(it, true) })
+        return@AnimatedContent
+    }
     val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     Scaffold(
         modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
@@ -314,6 +350,9 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
                             else -> "No TV picked"
                         },
                     )
+                },
+                actions = {
+                    IconButton(onClick = { showLibrary = true }) { Icon(AppIcons.History, "History and saved") }
                 },
                 scrollBehavior = scroll,
             )
@@ -436,7 +475,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
             SectionHeader("What to watch")
             OutlinedTextField(
                 value = imdbId,
-                onValueChange = { imdbId = Title.idIn(it) ?: it.trim() },     // a pasted IMDb link works too
+                onValueChange = { imdbId = Title.idIn(it) ?: it.trim(); keepType = false },     // a pasted IMDb link works too
                 label = { Text("IMDb link or ID") },
                 placeholder = { Text("tt0120737") },
                 supportingText = { Text("Or share an IMDb page here, from Chrome or the IMDb app") },
@@ -445,12 +484,28 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
                 shape = MaterialTheme.shapes.large,
                 trailingIcon = {
                     TextButton(onClick = {
-                        clipboard.getText()?.text?.let { t -> Title.idIn(t)?.let { imdbId = it; autoName = true } }
+                        clipboard.getText()?.text?.let { t -> Title.idIn(t)?.let { imdbId = it; autoName = true; keepType = false } }
                     }) { Text("Paste") }
                 },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 modifier = Modifier.fillMaxWidth(),
             )
+
+            // Nothing entered: the last few used, one tap from the TV.
+            val recent = entries.filter { it.inHistory }.take(3)
+            if (!idOk && recent.isNotEmpty()) {
+                SectionHeader("Recent") {
+                    TextButton(onClick = { showLibrary = true }) { Text("See all") }
+                }
+                for (e in recent) {
+                    EntryRow(
+                        e,
+                        onOpen = { pick(e, false) },
+                        onPlay = { pick(e, true) },
+                        onToggleSaved = { library.setSaved(e.title(), null, !e.saved) },
+                    )
+                }
+            }
 
             AnimatedContent(targetState = Triple(meta, lookingUp, idOk), label = "title") { (m, looking, valid) ->
                 when {
@@ -463,12 +518,27 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
                 }
             }
 
+            if (idOk && (meta != null || name.isNotBlank())) {
+                val savedNow = entries.any { it.imdbId == imdbId && it.saved }
+                ToggleButton(
+                    checked = savedNow,
+                    onCheckedChange = { on ->
+                        library.setSaved(Title(imdbId, name.ifBlank { meta?.name.orEmpty() }, series, season, episode), meta, on)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(if (savedNow) AppIcons.Bookmark else AppIcons.BookmarkBorder, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (savedNow) "Saved for later" else "Save for later")
+                }
+            }
+
             if (idOk) {
                 // Movie or series: set by the lookup, yours to change.
                 Row(horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween)) {
                     ToggleButton(
                         checked = !series,
-                        onCheckedChange = { series = false },
+                        onCheckedChange = { series = false; keepType = true },
                         shapes = ButtonGroupDefaults.connectedLeadingButtonShapes(),
                         modifier = Modifier.weight(1f),
                     ) {
@@ -478,7 +548,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
                     }
                     ToggleButton(
                         checked = series,
-                        onCheckedChange = { series = true },
+                        onCheckedChange = { series = true; keepType = true },
                         shapes = ButtonGroupDefaults.connectedTrailingButtonShapes(),
                         modifier = Modifier.weight(1f),
                     ) {
@@ -527,6 +597,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
                 modifier = Modifier.padding(vertical = 8.dp),
             )
         }
+    }
     }
 }
 
