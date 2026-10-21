@@ -10,6 +10,9 @@ picker. Movies open right away; for a series, pick the season and episode, then 
 - **Finding the TV.** Google TVs announce themselves on the Wi-Fi (mDNS): `_androidtvremote2._tcp` gives the TV's
   name ("Living room TV"), `_adb._tcp` on port 5555 means network debugging is on. No address to type
   ([TvFinder.kt](app/src/main/java/dev/nuvioremote/TvFinder.kt)).
+- **Which Nuvio.** The TV says which apps open `nuvio://` (the Play Store and GitHub builds, forks that kept the
+  scheme), plus those opening `stremio://` with Nuvio's activity class `com.nuvio.tv.MainActivity` (forks with their
+  own scheme; not Stremio itself). Pick one under **Open with**; titles open in its own activity.
 - **The title.** The IMDb id (from the shared link, or typed) gives the name and whether it's a movie or a series,
   through [Cinemeta](https://v3-cinemeta.strem.io), the free catalog Stremio and Nuvio use
   ([Meta.kt](app/src/main/java/dev/nuvioremote/Meta.kt)).

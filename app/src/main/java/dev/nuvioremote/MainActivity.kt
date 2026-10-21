@@ -156,6 +156,12 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
     var searching by remember { mutableStateOf(true) }
     var searchRun by remember { mutableIntStateOf(0) }
     var manual by remember { mutableStateOf(false) }
+    // The Nuvio apps on that TV (Play Store and GitHub builds, forks), and the one to open titles in.
+    var apps by remember { mutableStateOf(emptyList<TvLink.NuvioApp>()) }
+    var appsLoading by remember { mutableStateOf(false) }
+    var appsError by remember { mutableStateOf<String?>(null) }
+    var appsRun by remember { mutableIntStateOf(0) }
+    var appComponent by remember { mutableStateOf(prefs.getString("app", null)) }
     val finder = remember {
         TvFinder(context) { found ->
             tvs = found
@@ -200,6 +206,25 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
     val ready = hostOk && idOk && !busy
     val tvLabel = tvName.ifEmpty { host.trim().ifEmpty { "the TV" } }
 
+    // A TV picked: which Nuvio apps it has (connecting is also when it asks to allow this phone, the first time).
+    LaunchedEffect(host.trim(), appsRun) {
+        apps = emptyList()
+        appsError = null
+        if (host.isBlank()) return@LaunchedEffect
+        delay(500)      // typing an address: wait for the whole of it
+        appsLoading = true
+        try {
+            val found = TvLink.apps(context, host)
+            apps = found
+            if (found.none { it.component == appComponent }) appComponent = found.firstOrNull()?.component
+            if (found.isEmpty()) appsError = "There's no Nuvio app on $tvLabel. Install it from the Play Store or GitHub."
+        } catch (e: Exception) {
+            appsError = "Couldn't reach $tvLabel: ${e.message ?: e.javaClass.simpleName}"
+        } finally {
+            appsLoading = false
+        }
+    }
+
     fun openOnTv() {
         busy = true
         failed = false
@@ -214,8 +239,8 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
                     name = n
                 }
                 val title = Title(imdbId.trim(), n, series, season, episode)
-                TvLink.open(context, host, title)
-                prefs.edit().putString("host", host.trim()).putString("tvName", tvName).apply()
+                TvLink.open(context, host, title, appComponent)
+                prefs.edit().putString("host", host.trim()).putString("tvName", tvName).putString("app", appComponent).apply()
                 status = "Playing “${title.name}”" + (if (series) " S$season E$episode" else "") + " on $tvLabel."
             } catch (e: Exception) {
                 failed = true
@@ -374,6 +399,39 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
                 TextButton(onClick = { manual = true }) { Text("Enter an address instead") }
             }
 
+            // MARK: Open with
+            if (hostOk) {
+                SectionHeader("Open with") {
+                    if (!appsLoading) {
+                        TextButton(onClick = { appsRun++ }) {
+                            Icon(Icons.Rounded.Refresh, null, Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Check again")
+                        }
+                    }
+                }
+                when {
+                    appsLoading -> Surface(
+                        shape = MaterialTheme.shapes.extraLarge,
+                        color = MaterialTheme.colorScheme.surfaceContainer,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
+                            LoadingIndicator(Modifier.size(40.dp))
+                            Spacer(Modifier.width(16.dp))
+                            Text(
+                                "Checking $tvLabel's apps… The first time, allow USB debugging on the TV.",
+                                style = MaterialTheme.typography.bodyLarge,
+                            )
+                        }
+                    }
+                    appsError != null -> NoteCard(Icons.Rounded.Warning, appsError!!, error = true)
+                    else -> for (app in apps) {
+                        AppCard(app, selected = app.component == appComponent, onClick = { appComponent = app.component })
+                    }
+                }
+            }
+
             // MARK: What to watch
             SectionHeader("What to watch")
             OutlinedTextField(
@@ -520,6 +578,50 @@ private fun TvCard(tv: TvFinder.Tv, selected: Boolean, onClick: () -> Unit) {
                 )
             }
             if (selected) Icon(Icons.Rounded.Check, "Selected", tint = MaterialTheme.colorScheme.primary)
+        }
+    }
+}
+
+/** A Nuvio app on the TV: its build (version, where it came from); the picked one gets the cookie badge. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun AppCard(app: TvLink.NuvioApp, selected: Boolean, onClick: () -> Unit) {
+    val container by animateColorAsState(
+        if (selected) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
+        label = "app",
+    )
+    Card(
+        onClick = onClick,
+        shape = MaterialTheme.shapes.extraLarge,
+        colors = CardDefaults.cardColors(containerColor = container),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier
+                    .size(52.dp)
+                    .clip(if (selected) MaterialShapes.Cookie9Sided.toShape() else MaterialShapes.Circle.toShape())
+                    .background(if (selected) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.secondaryContainer),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Rounded.PlayArrow, null, Modifier.size(28.dp),
+                    tint = if (selected) MaterialTheme.colorScheme.onTertiary else MaterialTheme.colorScheme.onSecondaryContainer,
+                )
+            }
+            Spacer(Modifier.width(16.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    listOfNotNull(app.name, app.version).joinToString(" · "),
+                    style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    "${app.source} · ${app.pkg}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (selected) Icon(Icons.Rounded.Check, "Selected", tint = MaterialTheme.colorScheme.tertiary)
         }
     }
 }
