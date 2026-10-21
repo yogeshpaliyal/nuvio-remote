@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/brand/logo.svg" width="128" alt="Skiff"></p>
+
 # Skiff — Send to TV
 
 Send what you found on your phone to your Android TV / Google TV: share a page to Skiff, and it opens on the TV.
@@ -8,6 +10,8 @@ Send what you found on your phone to your Android TV / Google TV: share a page t
   kind of link opens is set by [link rules](RULES.md): a fix there reaches the app without a new release.
 
 Not affiliated with Nuvio or any streaming service.
+
+![Skiff — Send to TV](docs/brand/banner.png)
 
 ## History and Saved for later
 

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Skiff's mark: a skiff whose sail is a play button (docs/brand/logo.svg), at 72% for launcher masks. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <group android:pivotX="54" android:pivotY="54" android:scaleX="0.72" android:scaleY="0.72">
+        <path android:pathData="M50,27.5L50,61.5L75,48.5Z" android:fillColor="#FFFFFFFF"
+            android:strokeColor="#FFFFFFFF" android:strokeWidth="4" android:strokeLineJoin="round" />
+        <path android:pathData="M29,67.5H79L70,80.5H38Z" android:fillColor="#FFFFFFFF"
+            android:strokeColor="#FFFFFFFF" android:strokeWidth="4" android:strokeLineJoin="round" />
+    </group>
+</vector>
