@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "about": "How Skiff opens links on the TV. The first rule whose match fits the link is used; a link no rule matches is sent as it is to whichever TV app opens it. See RULES.md.",
   "rules": [
     {
@@ -36,6 +36,15 @@
       "title": "og"
     },
     {
+      "id": "stremio",
+      "name": "Stremio",
+      "match": { "hosts": ["web.stremio.com"], "schemes": ["stremio"] },
+      "rewrite": { "from": "^https?://web\\.stremio\\.com/#/", "to": "stremio:///" },
+      "packages": ["com.stremio.one"],
+      "flags": ["NEW_TASK", "CLEAR_TASK"],
+      "title": "slug"
+    },
+    {
       "id": "prime-video",
       "name": "Prime Video",
       "match": { "hosts": ["primevideo.com"] },
@@ -52,6 +61,7 @@
     "tv.airtel.xstream.tvapp": "Airtel Xstream",
     "com.disney.disneyplus": "Disney+",
     "com.spotify.tv.android": "Spotify",
+    "com.stremio.one": "Stremio",
     "com.nuvio.tv": "Nuvio",
     "com.nuvio.app": "Nuvio"
   }

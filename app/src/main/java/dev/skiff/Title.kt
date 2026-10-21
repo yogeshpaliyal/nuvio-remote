@@ -12,6 +12,13 @@ data class Title(
     val videoId: String get() = if (series) "$imdbId:$season:$episode" else imdbId
 
     /**
+     * Stremio's link for it: `streams`, its stream list ("stremio:///detail/series/tt42127457/tt42127457:1:4"); else
+     * the title's page.
+     */
+    fun stremioLink(streams: Boolean): String =
+        "stremio:///detail/${if (series) "series" else "movie"}/$imdbId" + if (streams) "/$videoId" else ""
+
+    /**
      * A shared page: its IMDb id, and whatever its text says about the name and type (null = not said). Or, with no
      * IMDb id, any other `link` (JioHotstar, YouTube…), with imdbId empty.
      */

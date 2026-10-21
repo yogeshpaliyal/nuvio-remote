@@ -256,7 +256,7 @@ fun SettingsScreen(host: String, tvName: String, onBack: () -> Unit, startOnActi
                     Text("Links and titles", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                     ViaChoice(linkVia) { linkVia = it; Connection.setLink(context, host, it) }
                     Text(
-                        linkHelp(linkVia) + " Over pairing the TV picks the app, and Nuvio opens a title's page; over USB debugging you pick the app, the link's rules apply, and Nuvio goes straight to the streams.",
+                        linkHelp(linkVia) + " Over pairing the TV picks a link's app, and a title opens in Nuvio (its page) or Stremio (its streams); over USB debugging you pick the app, the link's rules apply, and Nuvio goes straight to the streams.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

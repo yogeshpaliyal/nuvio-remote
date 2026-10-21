@@ -205,6 +205,9 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
     var appsError by remember { mutableStateOf<String?>(null) }
     var appsRun by remember { mutableIntStateOf(0) }
     var appComponent by remember { mutableStateOf(prefs.getString("app", null)) }
+    // Over pairing there's no list of the TV's apps: titles open in the one you pick, Nuvio or Stremio.
+    var pairedStremio by remember { mutableStateOf(prefs.getString("titleApp", "nuvio") == "stremio") }
+    LaunchedEffect(pairedStremio) { prefs.edit().putString("titleApp", if (pairedStremio) "stremio" else "nuvio").apply() }
     val finder = remember {
         TvFinder(context) { found ->
             tvs = found
@@ -299,6 +302,9 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
     }
     val linkByPairing = linkOk && useAdb == false
     val titleByPairing = idOk && !linkOk && useAdb == false
+    // Where a title opens: "Nuvio" or "Stremio" (for the status line and the Activity log).
+    val titleApp = if (useAdb == false) (if (pairedStremio) "Stremio" else "Nuvio")
+        else apps.firstOrNull { it.component == appComponent }?.name ?: apps.firstOrNull()?.name ?: "Nuvio"
     val ready = hostOk && useAdb != null && (idOk || (linkOk && (linkApps.isNotEmpty() || linkByPairing))) && !busy
     val tvLabel = tvName.ifEmpty { host.trim().ifEmpty { "the TV" } }
 
@@ -312,7 +318,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
             val found = TvLink.apps(context, host)
             apps = found
             if (found.none { it.component == appComponent }) appComponent = found.firstOrNull()?.component
-            if (found.isEmpty()) appsError = "There's no Nuvio app on $tvLabel. Install it from the Play Store or GitHub."
+            if (found.isEmpty()) appsError = "There's no Nuvio or Stremio app on $tvLabel. Install one, then check again."
         } catch (e: Exception) {
             appsError = "Couldn't reach $tvLabel: ${e.message ?: e.javaClass.simpleName}"
         } finally {
@@ -365,18 +371,23 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                 }
                 val title = Title(imdbId.trim(), n.ifEmpty { imdbId.trim() }, series, season, episode)
                 if (byPairing) {
-                    Atv.openLink(context, host, "nuvio://${if (series) "series" else "movie"}/${title.imdbId}")
+                    // Stremio's link goes to the episode's streams; Nuvio's, to the title's page.
+                    Atv.openLink(context, host, if (pairedStremio) title.stremioLink(streams = true) else "nuvio://${if (series) "series" else "movie"}/${title.imdbId}")
                 } else {
                     TvLink.open(context, host, title, appComponent)
                 }
                 library.use(title, meta, played = true)
                 prefs.edit().putString("host", host.trim()).putString("tvName", tvName).putString("app", appComponent).apply()
-                status = if (byPairing) "Opened “${title.name}” in Nuvio on $tvLabel: pick a stream there."
-                else "Playing “${title.name}”" + (if (series) " S$season E$episode" else "") + " on $tvLabel."
-                ActivityLog.add(context, "Nuvio “${title.name}”", via)
+                status = when {
+                    byPairing && pairedStremio -> "Opened “${title.name}” in Stremio on $tvLabel: pick a stream there."
+                    byPairing -> "Opened “${title.name}” in Nuvio on $tvLabel: pick a stream there."
+                    titleApp == "Stremio" -> "Opened “${title.name}”" + (if (series) " S$season E$episode" else "") + " in Stremio on $tvLabel: pick a stream there."
+                    else -> "Playing “${title.name}”" + (if (series) " S$season E$episode" else "") + " on $tvLabel."
+                }
+                ActivityLog.add(context, "$titleApp “${title.name}”", via)
                 Telemetry.event(context, "play_title", "via" to (if (byPairing) "pairing" else "adb"), "series" to series, "ok" to true)
             } catch (e: Exception) {
-                ActivityLog.add(context, "Nuvio “${name.trim().ifEmpty { imdbId }}”", via, ok = false)
+                ActivityLog.add(context, "$titleApp “${name.trim().ifEmpty { imdbId }}”", via, ok = false)
                 Telemetry.event(context, "play_title", "via" to (if (byPairing) "pairing" else "adb"), "series" to series, "ok" to false)
                 failed = true
                 status = "Couldn't open it: ${e.message ?: e.javaClass.simpleName}"
@@ -852,19 +863,21 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                     else apps.firstOrNull { it.component == appComponent }?.let { listOfNotNull(it.name, it.version).joinToString(" ") }
                 val loading = if (linkOk) linkAppsLoading else appsLoading
                 val line = when {
-                    useAdb == false -> if (linkOk) "Opens in the TV's app for ${link?.let(Links::site)}" else "Opens in Nuvio, on the title's page"
+                    useAdb == false -> if (linkOk) "Opens in the TV's app for ${link?.let(Links::site)}"
+                        else if (pairedStremio) "Opens in Stremio, at the streams" else "Opens in Nuvio, on the title's page"
                     useAdb == null -> null
                     loading -> "Checking which app opens it…"
                     chosen != null -> "Opens in $chosen"
                     linkOk -> "No app on $tvLabel opens ${link?.let(Links::site)} links"
-                    else -> appsError ?: "No Nuvio app on $tvLabel"
+                    else -> appsError ?: "No Nuvio or Stremio app on $tvLabel"
                 }
-                val choosable = useAdb == true && !loading && (if (linkOk) linkApps.size else apps.size) > 1
+                val pairedChoice = useAdb == false && !linkOk      // Nuvio or Stremio, over pairing
+                val choosable = pairedChoice || useAdb == true && !loading && (if (linkOk) linkApps.size else apps.size) > 1
                 val problem = useAdb == true && !loading && chosen == null
                 if (line != null) {
                     Surface(
                         onClick = { showAppSheet = true },
-                        enabled = useAdb == true && !loading,
+                        enabled = pairedChoice || useAdb == true && !loading,
                         shape = MaterialTheme.shapes.large,
                         color = if (problem) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceContainer,
                         modifier = Modifier.fillMaxWidth(),
@@ -968,13 +981,23 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 SectionHeader("Open with") {
-                    TextButton(onClick = { adbRun++; if (linkOk) linkRun++ else appsRun++ }) {
+                    if (useAdb == true) TextButton(onClick = { adbRun++; if (linkOk) linkRun++ else appsRun++ }) {
                         Icon(Icons.Rounded.Refresh, null, Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
                         Text("Check again")
                     }
                 }
-                if (linkOk) {
+                if (useAdb == false && !linkOk) {
+                    // Paired: the TV doesn't say which apps it has, so these are what Skiff knows how to open.
+                    AppCard(
+                        "Nuvio", "Opens the title's page",
+                        selected = !pairedStremio, onClick = { pairedStremio = false; showAppSheet = false },
+                    )
+                    AppCard(
+                        "Stremio", "Opens the streams for it (the episode, for a series)",
+                        selected = pairedStremio, onClick = { pairedStremio = true; showAppSheet = false },
+                    )
+                } else if (linkOk) {
                     when {
                         linkAppsLoading -> Surface(
                             shape = MaterialTheme.shapes.extraLarge,
@@ -1119,7 +1142,7 @@ private fun TvCard(tv: TvFinder.Tv, selected: Boolean, paired: Boolean, onClick:
     }
 }
 
-/** A TV app to open in: a Nuvio build (version, where it came from), or the app for a link; the picked one gets the cookie badge. */
+/** A TV app to open in: a Nuvio build or Stremio (version, where it came from), or the app for a link; the picked one gets the cookie badge. */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun AppCard(title: String, subtitle: String, selected: Boolean, onClick: () -> Unit) {
