@@ -16,7 +16,8 @@ None of this leaves the phone, except to your TV when you send something.
 
 ## Sent to services
 
-- **Cinemeta** (`v3-cinemeta.strem.io`): the IMDb id of a title you share, for its name, art and type.
+- **Cinemeta** (`v3-cinemeta.strem.io`): the IMDb id of a title you share, for its name, art and type; and the words
+  you type in the search box (not a link or an IMDb id), to find matching titles. Nothing else goes with them.
 - **The page you share**: Skiff reads its title and picture (as a browser would).
 - **Link rules**: once a day, Skiff downloads [rules.json](app/src/main/assets/rules.json) from this repository.
 - **Firebase Crashlytics** (Google): when Skiff crashes, the crash report (stack trace, device model, Android

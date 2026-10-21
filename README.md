@@ -4,6 +4,8 @@
 
 Send what you found on your phone to your Android TV / Google TV: share a page to Skiff, and it opens on the TV.
 
+- **A title by name:** type it in the box ("panchayat") and pick it from the results (Cinemeta's search), then
+  **Play**.
 - **An IMDb page** (from Chrome or the IMDb app) opens in [Nuvio](https://github.com/NuvioMedia/NuvioTV): on that
   title's stream picker over USB debugging (for a series, pick the season and episode, then **Play**), or on its page
   when paired.

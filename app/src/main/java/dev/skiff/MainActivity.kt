@@ -235,6 +235,9 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
     var shareRun by remember { mutableIntStateOf(0) }     // the same page shared again looks it up again
     // Movie or series set by you (the toggle, or an entry you edited): the lookup doesn't change it back.
     var keepType by remember { mutableStateOf(false) }
+    // Typed words that aren't a link or an IMDb id: a title search (Cinemeta), its results under the box.
+    var hits by remember { mutableStateOf(emptyList<Meta.Hit>()) }
+    var findingTitles by remember { mutableStateOf(false) }
     // Or any other link (JioHotstar, YouTube…): opened on the TV by the app that opens such links.
     var link by remember { mutableStateOf<String?>(null) }
     var linkTitle by remember { mutableStateOf("") }       // what the share called it, until the page says
@@ -740,6 +743,14 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
 
             // MARK: What to watch
             SectionHeader("What to watch")
+            val query = if (link == null && !Title.isImdbId(imdbId)) imdbId.trim() else ""
+            LaunchedEffect(query) {
+                if (query.length < 2) { hits = emptyList(); findingTitles = false; return@LaunchedEffect }
+                delay(350)      // typing: search once the word is there
+                findingTitles = true
+                hits = Meta.search(query)
+                findingTitles = false
+            }
             OutlinedTextField(
                 value = link ?: imdbId,
                 onValueChange = { v ->
@@ -751,10 +762,10 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                         else -> { link = null; imdbId = v.trim(); keepType = false }
                     }
                 },
-                label = { Text("Link or IMDb ID") },
-                placeholder = { Text("tt0120737, or a JioHotstar / YouTube link") },
+                label = { Text("Search, link or IMDb ID") },
+                placeholder = { Text("A title, or a YouTube / JioHotstar link") },
                 supportingText = { Text("Or share a page here: IMDb, JioHotstar, YouTube…") },
-                isError = imdbId.isNotEmpty() && !idOk && !linkOk,
+                isError = imdbId.lowercase().startsWith("tt") && imdbId.drop(2).all { it.isDigit() } && imdbId.length > 2 && !idOk,
                 singleLine = true,
                 shape = MaterialTheme.shapes.large,
                 trailingIcon = {
@@ -773,9 +784,35 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                 modifier = Modifier.fillMaxWidth(),
             )
 
+            // A search: the titles found, one tap fills it in (as a shared IMDb page does).
+            if (query.length >= 2) {
+                when {
+                    hits.isNotEmpty() -> for (h in hits) {
+                        SearchHitRow(h) {
+                            imdbId = h.imdbId
+                            name = h.name
+                            series = h.series
+                            autoName = true
+                            keepType = false
+                            hits = emptyList()
+                        }
+                    }
+                    findingTitles -> Row(verticalAlignment = Alignment.CenterVertically) {
+                        LoadingIndicator(Modifier.size(32.dp))
+                        Spacer(Modifier.width(12.dp))
+                        Text("Searching…", style = MaterialTheme.typography.bodyMedium)
+                    }
+                    else -> Text(
+                        "No title called “$query”. Try fewer words, or paste its IMDb link.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
             // Nothing entered: the last few used, one tap from the TV.
             val recent = entries.filter { it.inHistory }.take(3)
-            if (!idOk && !linkOk && recent.isNotEmpty()) {
+            if (!idOk && !linkOk && query.length < 2 && recent.isNotEmpty()) {
                 SectionHeader("Recent") {
                     TextButton(onClick = { showLibrary = true }) { Text("See all") }
                 }
@@ -912,6 +949,39 @@ private fun SectionHeader(text: String, action: @Composable () -> Unit = {}) {
 }
 
 /** A TV: its name and address; the selected one gets the expressive cookie badge and the primary container. */
+/** A title found by search: poster, name, movie or series and year; tap to fill it in. */
+@Composable
+private fun SearchHitRow(h: Meta.Hit, onPick: () -> Unit) {
+    Card(
+        onClick = onPick,
+        shape = MaterialTheme.shapes.extraLarge,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier.width(46.dp).height(68.dp).clip(RoundedCornerShape(10.dp))
+                    .background(MaterialTheme.colorScheme.secondaryContainer),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(if (h.series) AppIcons.Series else AppIcons.Movie, null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
+                if (h.poster != null) {
+                    AsyncImage(model = h.poster, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.matchParentSize())
+                }
+            }
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text(h.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(
+                    listOfNotNull(if (h.series) "Series" else "Movie", h.year).joinToString(" · "),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun TvCard(tv: TvFinder.Tv, selected: Boolean, paired: Boolean, onClick: () -> Unit) {
