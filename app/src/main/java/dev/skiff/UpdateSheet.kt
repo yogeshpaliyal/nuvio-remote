@@ -46,7 +46,7 @@ fun UpdateSheet(r: Updates.Release, onDismiss: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
-                TextButton(onClick = onDismiss) { Text("Later") }
+                TextButton(onClick = { Updates.later(context, r); onDismiss() }) { Text("Later") }
                 Spacer(Modifier.width(8.dp))
                 Button(onClick = { Updates.open(context, r); onDismiss() }) { Text("Update") }
             }

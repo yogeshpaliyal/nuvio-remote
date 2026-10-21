@@ -556,10 +556,10 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                 actions = {
                     IconButton(onClick = { showLibrary = true }) { Icon(AppIcons.History, "History and saved") }
                     // A dot on Settings when a newer Skiff is out (Settings → Update).
-                    val update by Updates.update.collectAsState()
+                    val dot by Updates.badge.collectAsState(initial = false)
                     IconButton(onClick = { showSettings = true }) {
-                        BadgedBox(badge = { if (update != null) Badge() }) {
-                            Icon(Icons.Rounded.Settings, if (update != null) "Settings: an update is available" else "Settings")
+                        BadgedBox(badge = { if (dot) Badge() }) {
+                            Icon(Icons.Rounded.Settings, if (dot) "Settings: an update is available" else "Settings")
                         }
                     }
                 },

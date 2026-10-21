@@ -30,6 +30,19 @@ object Updates {
 
     private fun prefs(context: Context) = context.getSharedPreferences("updates", Context.MODE_PRIVATE)
 
+    // The version you said "Later" to: the Settings icon's dot stays off for it (Settings still offers it).
+    private val laterFor = MutableStateFlow<String?>(null)
+
+    /** Whether to put the dot on the Settings icon: a newer version, not one you said "Later" to. */
+    val badge: kotlinx.coroutines.flow.Flow<Boolean> =
+        kotlinx.coroutines.flow.combine(available, laterFor) { r, later -> r != null && r.version != later }
+
+    /** "Later" for this version: no dot for it; a newer one brings it back. */
+    fun later(context: Context, r: Release) {
+        prefs(context).edit().putString("later", r.version).apply()
+        laterFor.value = r.version
+    }
+
     /** This build's version: "1.8.0" (a debug build's "-debug" left off). */
     fun current(context: Context): String = runCatching {
         context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty().substringBefore('-')
@@ -52,6 +65,7 @@ object Updates {
      */
     suspend fun check(context: Context, force: Boolean = false): Release? = withContext(Dispatchers.IO) {
         val p = prefs(context)
+        laterFor.value = p.getString("later", null)
         val cached = p.getString("latest", null)?.let { runCatching { parse(JSONObject(it)) }.getOrNull() }
         val fresh = System.currentTimeMillis() - p.getLong("checkedAt", 0) < EVERY
         val latest = if (!force && fresh && cached != null) cached else {
