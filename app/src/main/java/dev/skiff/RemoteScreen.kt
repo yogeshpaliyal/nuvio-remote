@@ -57,6 +57,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -105,6 +108,8 @@ fun RemoteScreen(host: String, tvName: String, onBack: () -> Unit) {
     var typing by remember { mutableStateOf(false) }
     var typed by remember { mutableStateOf("") }
     val ready = remote != null
+    // Keys pressed while (re)connecting: sent, in order, once connected, instead of being lost.
+    val waiting = remember { mutableListOf<Int>() }
 
     // Connected while the remote is showing, as Settings says: Automatic is USB debugging when this phone is allowed
     // there, else paired (the Google TV remote protocol), else USB debugging anyway (the TV asks to allow this phone),
@@ -158,19 +163,55 @@ fun RemoteScreen(host: String, tvName: String, onBack: () -> Unit) {
     }
     DisposableEffect(Unit) { onDispose { remote?.close() } }
 
-    /** A key now. A dropped connection reconnects (that key is lost: press again). */
+    fun keyName(code: Int) = "Key " + KeyEvent.keyCodeToString(code).removePrefix("KEYCODE_")
+
+    /** Reconnects, the key kept to send once connected (the TV may have closed this remote for another phone's). */
+    fun reconnect(code: Int?) {
+        if (code != null && waiting.size < 8) waiting += code
+        if (remote != null) {
+            remote?.close()
+            remote = null
+            attempt++
+        }
+    }
+
+    // Connected (again): the keys pressed meanwhile go now.
+    LaunchedEffect(remote) {
+        val r = remote ?: return@LaunchedEffect
+        while (waiting.isNotEmpty()) {
+            val code = waiting.removeAt(0)
+            runCatching { r.key(code) }
+                .onSuccess { ActivityLog.add(context, keyName(code) + " (after reconnecting)", via) }
+                .onFailure { ActivityLog.add(context, keyName(code), via, ok = false) }
+        }
+    }
+
+    // Back in the foreground: reconnect if the TV closed this remote meanwhile.
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(lifecycle) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME && remote?.isOpen == false) reconnect(null)
+        }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
+    }
+
+    /** A key now. A closed connection reconnects first, and the key goes once it's back. */
     fun press(code: Int) {
         view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
-        val r = remote ?: return
+        val r = remote
+        if (r == null) {
+            // Already reconnecting: this key waits its turn.
+            if (attempt > 0 && error == null && waiting.size < 8) waiting += code
+            return
+        }
+        if (!r.isOpen) return reconnect(code)
         scope.launch {
             try {
                 r.key(code)
-                ActivityLog.add(context, "Key " + KeyEvent.keyCodeToString(code).removePrefix("KEYCODE_"), via)
+                ActivityLog.add(context, keyName(code), via)
             } catch (e: Exception) {
-                ActivityLog.add(context, "Key " + KeyEvent.keyCodeToString(code).removePrefix("KEYCODE_"), via, ok = false)
-                remote?.close()
-                remote = null
-                attempt++
+                reconnect(code)
             }
         }
     }

@@ -19,6 +19,12 @@ interface TvKeys : AutoCloseable {
      */
     val field: StateFlow<String?> get() = NO_FIELD
 
+    /**
+     * Still connected, as far as the phone knows. False once the TV closed it: over the remote protocol it keeps one
+     * remote at a time, so another phone (or Skiff Debug) connecting closes this one.
+     */
+    val isOpen: Boolean get() = true
+
     companion object {
         private val NO_FIELD: StateFlow<String?> = MutableStateFlow(null)
     }

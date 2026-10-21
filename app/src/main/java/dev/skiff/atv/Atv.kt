@@ -133,6 +133,7 @@ object Atv {
         @Volatile private var features = Messages.FEATURES
         @Volatile var closed = false
             private set
+        override val isOpen: Boolean get() = !closed
 
         internal fun start() {
             scope.launch {
