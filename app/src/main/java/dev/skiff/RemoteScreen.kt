@@ -115,6 +115,11 @@ fun RemoteScreen(host: String, tvName: String, onBack: () -> Unit) {
             error = "Pick a TV first."
             return@LaunchedEffect
         }
+        if (Demo.on) {
+            remote = Demo.keys
+            via = "USB debugging"
+            return@LaunchedEffect
+        }
         val name = tvName.ifEmpty { "the TV" }
         suspend fun viaAdb(): Boolean = try {
             remote = TvLink.remote(context, host)

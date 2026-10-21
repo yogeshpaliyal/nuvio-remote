@@ -12,7 +12,7 @@ supply` uploads them as they are). This file has the rest of the Play Console's 
 | Full description | `full_description.txt` |
 | App icon | `images/icon.png` (512×512, from [docs/brand/play/icon.html](../docs/brand/play/icon.html)) |
 | Feature graphic | `images/featureGraphic.png` (1024×500, from [feature-graphic.html](../docs/brand/play/feature-graphic.html)) |
-| Phone screenshots | `images/phoneScreenshots/`: still to take (2 to 8) |
+| Phone screenshots | `images/phoneScreenshots/`: five, taken in demo mode (Skiff Debug → Settings → Demo mode) |
 | Category | Tools |
 | Tags | Remote control, Streaming |
 | Website | https://github.yogeshpaliyal.com/skiff/ |

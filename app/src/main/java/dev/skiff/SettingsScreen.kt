@@ -86,7 +86,7 @@ import java.io.File
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun SettingsScreen(host: String, tvName: String, onBack: () -> Unit) {
+fun SettingsScreen(host: String, tvName: String, onBack: () -> Unit, startOnActivity: Boolean = false) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val tvLabel = tvName.ifEmpty { host.ifEmpty { "the TV" } }
@@ -168,7 +168,7 @@ fun SettingsScreen(host: String, tvName: String, onBack: () -> Unit) {
         }
     }
 
-    var showActivity by remember { mutableStateOf(false) }
+    var showActivity by remember { mutableStateOf(startOnActivity) }
     if (showActivity) {
         BackHandler { showActivity = false }
         ActivityScreen(onBack = { showActivity = false })
@@ -359,6 +359,24 @@ fun SettingsScreen(host: String, tvName: String, onBack: () -> Unit) {
                 // Debug builds: crash on purpose, to see a report reach Crashlytics (sent when the app opens again).
                 if (Telemetry.debuggable(context)) {
                     OutlinedButton(onClick = { Telemetry.testCrash(context) }, enabled = telemetry) { Text("Test crash") }
+                }
+            }
+            // Debug builds: a made-up TV and history, for store screenshots.
+            if (Telemetry.debuggable(context)) {
+                SectionHeader("Demo mode")
+                Panel {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Demo TV and history", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                "For screenshots: a made-up Living room TV, its apps and a sample history. Nothing is sent. Skiff restarts.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Switch(checked = Demo.on, onCheckedChange = { Demo.set(context, it) })
+                    }
                 }
             }
             Spacer(Modifier.size(24.dp))

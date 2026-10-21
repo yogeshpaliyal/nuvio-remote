@@ -31,7 +31,8 @@ class Library private constructor(context: Context) {
         fun title() = Title(imdbId, name, series, season, episode)
     }
 
-    private val file = File(context.filesDir, "library.json")
+    // Demo mode keeps its own sample history, apart from yours.
+    private val file = File(context.filesDir, if (Demo.on) "library-demo.json" else "library.json")
     private val state = MutableStateFlow(load())
     val entries: StateFlow<List<Entry>> = state
 
@@ -115,6 +116,7 @@ class Library private constructor(context: Context) {
     }
 
     private fun load(): List<Entry> = runCatching {
+        if (Demo.on && !file.exists()) return Demo.samples()
         val a = JSONArray(file.readText())
         List(a.length()) { i ->
             val o = a.getJSONObject(i)

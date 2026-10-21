@@ -4,6 +4,7 @@ import android.content.Context
 import dadb.AdbKeyPair
 import dadb.Dadb
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -57,7 +58,7 @@ object TvLink {
      * Off the main thread. A quick look (a few seconds at most): the port shut is OFF; open but no answer to this
      * phone's key is NOT_ALLOWED (the TV then shows "Allow USB debugging?": allowed there, the next check passes).
      */
-    suspend fun check(context: Context, host: String): Adb = lock.withLock {
+    suspend fun check(context: Context, host: String): Adb = if (Demo.on) Adb.ALLOWED else lock.withLock {
         withContext(Dispatchers.IO) {
             val open = runCatching { java.net.Socket().use { it.connect(java.net.InetSocketAddress(host.trim(), PORT), 2_000) } }.isSuccess
             if (!open) return@withContext Adb.OFF
@@ -68,18 +69,20 @@ object TvLink {
 
     /** Off the main thread. A shell command on the TV, as `adb shell` runs it (Settings → ADB tools). */
     suspend fun shell(context: Context, host: String, command: String): dadb.AdbShellResponse =
-        withTv(context, host) { it.shell(command) }
+        if (Demo.on) dadb.AdbShellResponse("package:com.google.android.youtube.tv\npackage:in.startv.hotstar\npackage:com.nuvio.tv\n", "", 0)
+        else withTv(context, host) { it.shell(command) }
 
     /**
      * Off the main thread. Installs an APK on the TV (as `adb install -r`; up to 5 minutes for the TV to answer: big
      * apps take a while). Throws with the TV's reason when it refuses (a different signature, too old an Android…).
      */
-    suspend fun install(context: Context, host: String, apk: File) = lock.withLock {
+    suspend fun install(context: Context, host: String, apk: File): Unit = if (Demo.on) delay(1_200) else lock.withLock {
         withContext(Dispatchers.IO) { connect(context, host, answer = 300_000).use { it.install(apk, "-r") } }
     }
 
     /** Off the main thread. The Nuvio apps on that TV, the TV build first. Throws when the TV can't be reached. */
-    suspend fun apps(context: Context, host: String): List<NuvioApp> = withTv(context, host, ::detect)
+    suspend fun apps(context: Context, host: String): List<NuvioApp> =
+        if (Demo.on) Demo.nuvioApps() else withTv(context, host, ::detect)
 
     /**
      * What Android says opens `nuvio://` (Nuvio's own scheme: every build, and forks that kept it), plus what opens
@@ -153,7 +156,7 @@ object TvLink {
      * open any web page (browsers, the Downloader app, the system's browser stub): those aren't "the app for it".
      */
     suspend fun linkApps(context: Context, host: String, link: String): List<LinkApp> =
-        withTv(context, host) { tv -> linkAppsOn(tv, Links.forTv(link)) }
+        if (Demo.on) Demo.linkApps(link) else withTv(context, host) { tv -> linkAppsOn(tv, Links.forTv(link)) }
 
     private fun linkAppsOn(tv: Dadb, link: String): List<LinkApp> {
         val query = "cmd package query-activities --brief -a android.intent.action.VIEW -d"
@@ -172,7 +175,7 @@ object TvLink {
      * JioHotstar, reads the link instead of just coming to the front.
      */
     suspend fun openLink(context: Context, host: String, link: String, component: String?): String =
-        withTv(context, host) { tv ->
+        if (Demo.on) { delay(600); "" } else withTv(context, host) { tv ->
             val tvLink = Links.forTv(link)
             val apps = linkAppsOn(tv, tvLink)
             val target = apps.firstOrNull { it.component == component } ?: apps.firstOrNull()
@@ -218,7 +221,7 @@ object TvLink {
      * throws when the TV can't be reached, has no Nuvio app, or refuses.
      */
     suspend fun open(context: Context, host: String, t: Title, component: String?): String =
-        withTv(context, host) { tv ->
+        if (Demo.on) { delay(600); "" } else withTv(context, host) { tv ->
             val apps = detect(tv)
             val target = apps.firstOrNull { it.component == component } ?: apps.firstOrNull()
                 ?: error("There's no Nuvio app on that TV.")

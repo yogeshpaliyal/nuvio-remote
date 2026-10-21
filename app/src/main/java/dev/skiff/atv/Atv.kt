@@ -3,6 +3,7 @@ package dev.skiff.atv
 import android.annotation.SuppressLint
 import android.content.Context
 import android.os.Build
+import dev.skiff.Demo
 import dev.skiff.TvKeys
 import android.security.keystore.KeyGenParameterSpec
 import android.util.Log
@@ -106,7 +107,7 @@ object Atv {
     }
 
     /** This phone paired with that TV (at that address) before. */
-    fun isPaired(context: Context, host: String) = prefs(context).contains(key(host))
+    fun isPaired(context: Context, host: String) = if (Demo.on) host.trim() == Demo.HOST else prefs(context).contains(key(host))
 
     /** Forget a TV (the TV keeps its side until "Android TV Remote Service" data is cleared on it). */
     fun forget(context: Context, host: String) = prefs(context).edit().remove(key(host)).apply()
@@ -218,6 +219,7 @@ object Atv {
 
     /** Off the main thread. Connects, opens a link on the TV (the TV picks the app), and disconnects. */
     suspend fun openLink(context: Context, host: String, link: String) {
+        if (Demo.on) return kotlinx.coroutines.delay(600)
         val remote = connect(context, host)
         try {
             remote.openLink(link)

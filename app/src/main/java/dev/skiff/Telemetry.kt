@@ -35,7 +35,7 @@ object Telemetry {
 
     /** A usage event: `name` and `params` in Analytics' form (lowercase, underscores; short values). */
     fun event(context: Context, name: String, vararg params: Pair<String, Any>) {
-        if (!available(context) || !enabled(context)) return
+        if (!available(context) || !enabled(context) || Demo.on) return
         val b = Bundle()
         for ((k, v) in params) when (v) {
             is Boolean -> b.putLong(k, if (v) 1 else 0)

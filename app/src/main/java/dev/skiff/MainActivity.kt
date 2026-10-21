@@ -105,24 +105,26 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
     /** The last IMDb page shared to us, read by the screen (null = nothing new). */
     private var shared by mutableStateOf<Title.Shared?>(null)
-    /** Opened from the Quick Settings tile: straight to the remote. */
-    private var openRemote by mutableStateOf(false)
+    /** A screen to open at once: "remote" (the Quick Settings tile), "library", "settings", "activity". */
+    private var openScreen by mutableStateOf<String?>(null)
 
     companion object {
-        const val EXTRA_OPEN_REMOTE = "open_remote"
+        /** `adb shell am start -n dev.skiff.debug/dev.skiff.MainActivity --es screen remote`, for screenshots too. */
+        const val EXTRA_SCREEN = "screen"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        Demo.init(this, if (intent.hasExtra("demo")) intent.getBooleanExtra("demo", false) else null)
         Telemetry.init(this)
         if (intent.getBooleanExtra("test_crash", false)) Telemetry.testCrash(this)
         Rules.init(this)
         shared = sharedTitle(intent)
-        openRemote = intent.getBooleanExtra(EXTRA_OPEN_REMOTE, false)
+        openScreen = intent.getStringExtra(EXTRA_SCREEN)
         setContent {
             AppTheme {
-                RemoteScreen(shared, onSharedUsed = { shared = null }, openRemote = openRemote, onOpenRemoteUsed = { openRemote = false })
+                RemoteScreen(shared, onSharedUsed = { shared = null }, openScreen = openScreen, onOpenScreenUsed = { openScreen = null })
             }
         }
     }
@@ -130,7 +132,7 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         sharedTitle(intent)?.let { shared = it }
-        if (intent.getBooleanExtra(EXTRA_OPEN_REMOTE, false)) openRemote = true
+        intent.getStringExtra(EXTRA_SCREEN)?.let { openScreen = it }
     }
 
     /** The volume buttons go to the TV while the remote is connected (HardwareKeys). */
@@ -162,7 +164,7 @@ private const val PREFS = "remote"
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openRemote: Boolean, onOpenRemoteUsed: () -> Unit) {
+private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openScreen: String?, onOpenScreenUsed: () -> Unit) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences(PREFS, Context.MODE_PRIVATE) }
     val scope = rememberCoroutineScope()
@@ -172,6 +174,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openRe
     var showLibrary by remember { mutableStateOf(false) }
     var showRemote by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
+    var openActivity by remember { mutableStateOf(false) }     // Settings opened on Activity
     @Suppress("DEPRECATION") val clipboard = LocalClipboardManager.current
 
     // The TV
@@ -496,12 +499,13 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openRe
     LaunchedEffect(showLibrary, showRemote, showSettings) {
         Telemetry.screen(context, when { showLibrary -> "library"; showRemote -> "remote"; showSettings -> "settings"; else -> "send" })
     }
-    LaunchedEffect(openRemote) {
-        if (!openRemote) return@LaunchedEffect
-        showLibrary = false
-        showSettings = false
-        showRemote = true
-        onOpenRemoteUsed()
+    LaunchedEffect(openScreen) {
+        val screen = openScreen ?: return@LaunchedEffect
+        showLibrary = screen == "library"
+        showSettings = screen == "settings" || screen == "activity"
+        showRemote = screen == "remote"
+        openActivity = screen == "activity"
+        onOpenScreenUsed()
     }
     BackHandler(enabled = showLibrary || showRemote || showSettings) { showLibrary = false; showRemote = false; showSettings = false }
     // 0: send, 1: library, 2: remote
@@ -515,7 +519,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openRe
         return@AnimatedContent
     }
     if (screen == 3) {
-        SettingsScreen(host.trim(), tvName, onBack = { showSettings = false })
+        SettingsScreen(host.trim(), tvName, onBack = { showSettings = false }, startOnActivity = openActivity)
         return@AnimatedContent
     }
     val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
@@ -548,7 +552,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openRe
         },
         bottomBar = {
             PlayBar(
-                label = if (hostOk) "Play on $tvLabel" else "Play on TV",
+                label = "Play",     // the TV is named in the top bar
                 enabled = ready,
                 busy = busy,
                 hint = when {
@@ -886,7 +890,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openRe
             }
 
             Text(
-                "Needs USB debugging on the TV (Settings → System → Developer options) and the phone on the same Wi-Fi.",
+                "The phone and the TV on the same Wi-Fi.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(vertical = 8.dp),

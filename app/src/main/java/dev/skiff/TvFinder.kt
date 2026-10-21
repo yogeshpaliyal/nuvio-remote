@@ -32,6 +32,7 @@ class TvFinder(context: Context, private val onChange: (List<Tv>) -> Unit) {
 
     fun start() {
         stop()
+        if (Demo.on) return onChange(Demo.tvs())
         names.clear()
         adb.clear()
         queue.clear()
