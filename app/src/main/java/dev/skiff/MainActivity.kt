@@ -238,11 +238,12 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
     // Paired with this TV: links open over the remote protocol, not ADB (the TV picks the app). Checked again when
     // the remote closes (pairing happens there).
     val paired = remember(host.trim(), showRemote, showSettings) { hostOk && Atv.isPaired(context, host) }
-    // How links open, per TV (Settings, or the switch under Open with): Automatic is pairing when paired (the TV picks
-    // the app), else USB debugging (you pick the app, and the link's rules apply).
+    // How links open, per TV (Settings, or the switch under Open with): Automatic is USB debugging when the TV answers
+    // there (the TV's apps listed: you pick one, and the link's rules apply), else pairing (the TV picks the app).
     var linkVia by remember(host.trim(), showSettings) { mutableStateOf(Connection.link(context, host)) }
+    var linkAdbOk by remember { mutableStateOf<Boolean?>(null) }     // the TV's ADB answered the app lookup; null: checking
     val linkByPairing = linkOk && when (linkVia) {
-        Connection.Via.AUTO -> paired
+        Connection.Via.AUTO -> paired && linkAdbOk == false
         Connection.Via.PAIRING -> true
         Connection.Via.ADB -> false
     }
@@ -280,11 +281,11 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
         }
     }
 
-    fun openLinkOnTv() {
+    /** `byPairing`: passed by the lookup, which knows before this composition does. */
+    fun openLinkOnTv(byPairing: Boolean = linkByPairing) {
         val l = link ?: return
         busy = true
         failed = false
-        val byPairing = linkByPairing
         status = if (byPairing) "Connecting…" else "Connecting… The first time, accept “Allow USB debugging?” on the TV (tick Always allow)."
         scope.launch {
             try {
@@ -410,33 +411,45 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit) {
         page = p
         if (recordLink) library.useLink(l, p, null, played = false)
     }
-    LaunchedEffect(link, host.trim(), shareRun, linkRun, linkByPairing) {
+    LaunchedEffect(link, host.trim(), shareRun, linkRun, linkVia, paired) {
         linkApps = emptyList()
+        linkAdbOk = null
         val l = link ?: return@LaunchedEffect
         if (host.isBlank()) return@LaunchedEffect
-        if (linkByPairing) {
-            // Over pairing: no app to look up, the TV picks it.
+        if (linkVia == Connection.Via.PAIRING) {
+            // Over pairing only: no app to look up, the TV picks it.
+            linkAdbOk = false
             if (openWhenKnown) {
                 openWhenKnown = false
-                if (!busy) openLinkOnTv()
+                if (!busy) openLinkOnTv(byPairing = true)
             }
             return@LaunchedEffect
         }
         delay(300)
         linkAppsLoading = true
+        // Automatic and paired: no USB debugging is fine, the link goes over pairing.
+        val pairingFallback = linkVia == Connection.Via.AUTO && paired
         try {
             val found = TvLink.linkApps(context, host, l)
             linkApps = found
+            linkAdbOk = true
             if (found.none { it.component == linkComponent }) linkComponent = found.firstOrNull()?.component
         } catch (e: Exception) {
-            failed = true
-            status = "Couldn't reach $tvLabel: ${e.message ?: e.javaClass.simpleName}"
+            linkAdbOk = false
+            if (!pairingFallback) {
+                failed = true
+                status = "Couldn't reach $tvLabel: ${e.message ?: e.javaClass.simpleName}"
+            }
         } finally {
             linkAppsLoading = false
         }
         if (openWhenKnown) {
             openWhenKnown = false
-            if (linkApps.isNotEmpty() && !busy) openLinkOnTv()
+            when {
+                busy -> {}
+                linkApps.isNotEmpty() -> openLinkOnTv(byPairing = false)
+                linkAdbOk == false && pairingFallback -> openLinkOnTv(byPairing = true)
+            }
         }
     }
 

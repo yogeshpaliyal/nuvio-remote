@@ -206,7 +206,7 @@ fun SettingsScreen(host: String, tvName: String, onBack: () -> Unit) {
                     Text("Links and titles", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                     ViaChoice(linkVia) { linkVia = it; Connection.setLink(context, host, it) }
                     Text(
-                        viaHelp(linkVia, "links") + " Over pairing the TV picks the app, and Nuvio opens a title's page; over USB debugging you pick the app, the link's rules apply, and Nuvio goes straight to the streams.",
+                        linkHelp(linkVia) + " Over pairing the TV picks the app, and Nuvio opens a title's page; over USB debugging you pick the app, the link's rules apply, and Nuvio goes straight to the streams.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -383,6 +383,11 @@ private fun viaHelp(via: Connection.Via, what: String) = when (via) {
     Connection.Via.AUTO -> "Automatic: $what over pairing when paired, else over USB debugging."
     Connection.Via.PAIRING -> "Only over pairing (the Google TV remote protocol)."
     Connection.Via.ADB -> "Only over USB debugging (ADB)."
+}
+
+private fun linkHelp(via: Connection.Via) = when (via) {
+    Connection.Via.AUTO -> "Automatic: over USB debugging when it's on (the TV's apps listed to pick from), else over pairing."
+    else -> viaHelp(via, "")
 }
 
 private fun displayName(context: Context, uri: Uri): String? = runCatching {
