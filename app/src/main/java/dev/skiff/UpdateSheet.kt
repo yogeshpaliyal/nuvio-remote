@@ -52,7 +52,9 @@ fun UpdateSheet(r: Updates.Release, onDismiss: () -> Unit) {
             }
             Text(
                 if (fromPlay) "Google Play downloads it while you use Skiff, then Skiff restarts into it. Your history stays."
-                else "Skiff downloads it, then Android asks you to update. Your history stays.",
+                else if (Updates.canInstall(context)) "Skiff downloads it, then Android asks you to update. Your history stays."
+                else "The first time, Android asks you to allow Skiff to install apps, and restarts Skiff when you do: " +
+                    "this sheet opens again, tap Update. Then Skiff downloads it and Android asks you to update. Your history stays.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

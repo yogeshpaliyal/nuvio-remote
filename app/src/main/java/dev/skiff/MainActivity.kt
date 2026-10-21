@@ -181,6 +181,14 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
     var showRemote by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
     var openActivity by remember { mutableStateOf(false) }     // Settings opened on Activity
+    var openUpdate by remember { mutableStateOf(false) }       // Settings opened on the update sheet
+    // Back after allowing Skiff to install apps (Android restarted it): the update, where you left it.
+    LaunchedEffect(Unit) {
+        if (Updates.resumeAfterAllow(context)) {
+            openUpdate = true
+            showSettings = true
+        }
+    }
     @Suppress("DEPRECATION") val clipboard = LocalClipboardManager.current
 
     // The TV
@@ -533,7 +541,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
         return@AnimatedContent
     }
     if (screen == 3) {
-        SettingsScreen(host.trim(), tvName, onBack = { showSettings = false }, startOnActivity = openActivity)
+        SettingsScreen(host.trim(), tvName, onBack = { showSettings = false; openUpdate = false }, startOnActivity = openActivity, startOnUpdate = openUpdate)
         return@AnimatedContent
     }
     var showTvSheet by remember { mutableStateOf(false) }

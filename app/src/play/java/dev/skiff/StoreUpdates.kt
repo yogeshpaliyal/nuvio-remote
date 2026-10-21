@@ -38,6 +38,9 @@ internal object StoreUpdates {
         return Updates.Release(version = "", notes = "", apkUrl = null, pageUrl = PAGE, id = "code:${i.availableVersionCode()}")
     }
 
+    /** Play installs its updates itself: Skiff never needs Android's permission to install apps. */
+    fun canInstall(context: Context) = false
+
     suspend fun open(context: Context, r: Updates.Release) {
         val manager = AppUpdateManagerFactory.create(context)
         val i = info

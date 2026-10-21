@@ -91,7 +91,7 @@ import java.io.File
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun SettingsScreen(host: String, tvName: String, onBack: () -> Unit, startOnActivity: Boolean = false) {
+fun SettingsScreen(host: String, tvName: String, onBack: () -> Unit, startOnActivity: Boolean = false, startOnUpdate: Boolean = false) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val tvLabel = tvName.ifEmpty { host.ifEmpty { "the TV" } }
@@ -372,7 +372,7 @@ fun SettingsScreen(host: String, tvName: String, onBack: () -> Unit, startOnActi
             val update by Updates.update.collectAsState()
             var checking by remember { mutableStateOf(false) }
             var checkNote by remember { mutableStateOf<String?>(null) }
-            var showUpdate by remember { mutableStateOf(false) }
+            var showUpdate by remember { mutableStateOf(startOnUpdate) }
             val current = Updates.current(context)
             Card(
                 onClick = {

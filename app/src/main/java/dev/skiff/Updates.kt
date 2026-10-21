@@ -77,6 +77,20 @@ object Updates {
     /** Getting the update, while it's under way (null otherwise). */
     val progress: StateFlow<Progress?> = progressState
 
+    /**
+     * Skiff was restarted by Android after you allowed it to install apps (asked for an update): true once, so the
+     * update sheet opens again.
+     */
+    fun resumeAfterAllow(context: Context): Boolean {
+        val p = prefs(context)
+        if (!p.getBoolean("resumeAfterAllow", false)) return false
+        p.edit().remove("resumeAfterAllow").apply()
+        return StoreUpdates.canInstall(context)
+    }
+
+    /** Android already lets Skiff install apps (the github build needs it to install its update). */
+    fun canInstall(context: Context) = StoreUpdates.canInstall(context)
+
     /** Gets the update, the store's way: Play's in-app update, or the APK downloaded and installed by Skiff. */
     suspend fun open(context: Context, r: Release) = StoreUpdates.open(context, r)
 }

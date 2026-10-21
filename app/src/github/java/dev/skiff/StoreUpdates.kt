@@ -43,15 +43,19 @@ internal object StoreUpdates {
     suspend fun open(context: Context, r: Updates.Release) {
         val apkUrl = r.apkUrl ?: return browse(context, r.pageUrl)
         val progress = Updates.progressState
-        // Android asks once to allow Skiff to install apps: its settings page, then Update again.
-        if (!context.packageManager.canRequestPackageInstalls()) {
+        // Android asks once to allow Skiff to install apps: its settings page. Allowing it restarts Skiff (Android
+        // does that), so Skiff remembers to reopen the update when it starts again.
+        if (!canInstall(context)) {
+            Updates.prefs(context).edit().putBoolean("resumeAfterAllow", true).apply()
             runCatching {
                 context.startActivity(
                     Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}"))
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                 )
             }
-            progress.value = Updates.Progress.Problem("Allow Skiff to install apps, then tap Update again.")
+            progress.value = Updates.Progress.Problem(
+                "Allow Skiff to install apps. Android restarts Skiff when you do; the update opens again, tap Update.",
+            )
             return
         }
         try {
@@ -68,6 +72,9 @@ internal object StoreUpdates {
     }
 
     private const val RELEASE_PACKAGE = "dev.skiff"
+
+    /** Android lets Skiff install apps (asked once, in its settings). */
+    fun canInstall(context: Context) = context.packageManager.canRequestPackageInstalls()
 
     private fun browse(context: Context, url: String) {
         runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
