@@ -64,6 +64,11 @@ Keystore; the TV's is pinned at pairing ([atv/](app/src/main/java/dev/skiff/atv)
 - **The title.** The IMDb id (from the shared link, or typed) gives the name and whether it's a movie or a series,
   through [Cinemeta](https://v3-cinemeta.strem.io), the free catalog Stremio and Nuvio use
   ([Meta.kt](app/src/main/java/dev/skiff/Meta.kt)).
+- **Title sites (Trakt…).** A [provider](app/src/main/java/dev/skiff/providers/TitleProvider.kt) turns a site's
+  link into the IMDb id (and the episode, when the link names one); from there it's a title like a shared IMDb page.
+  Another site is one file in [providers/](app/src/main/java/dev/skiff/providers) (see
+  [Trakt.kt](app/src/main/java/dev/skiff/providers/Trakt.kt)) and its name in `Providers.all`; the app's code doesn't
+  change.
 - **Opening it, paired.** Nuvio's own link, `nuvio://movie/tt…` or `nuvio://series/tt…`, sent as an app link: the
   title's page.
 - **Opening it in Stremio.** Stremio's deep link to the streams, `stremio:///detail/movie/tt0120737/tt0120737` or
