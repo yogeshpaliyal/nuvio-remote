@@ -571,7 +571,8 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
     // The TV and how it's reached, said once: on the chip under the title.
     val tvStatus = when {
         hostOk -> tvLabel + when {
-            useAdb == false -> " · Pairing"
+            // Over pairing ("Pairing only" in Settings shows it before pairing, too).
+            useAdb == false -> if (paired) " · paired" else " · not paired yet"
             adb == null -> " · checking…"
             adb == TvLink.Adb.ALLOWED -> " · USB debugging"
             else -> " · not connected yet"
