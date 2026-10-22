@@ -157,10 +157,15 @@ fun RemoteScreen(host: String, tvName: String, onBack: () -> Unit) {
         when (mode) {
             Connection.Via.ADB -> viaAdb()
             Connection.Via.PAIRING -> if (paired) viaPairing() else error = "Pair with $name to use the remote (Settings: Pairing only)."
-            Connection.Via.AUTO -> when {
-                TvLink.check(context, host) == TvLink.Adb.ALLOWED -> viaAdb() || (paired && viaPairing())
-                paired -> viaPairing()
-                !viaAdb() -> error = "Pair with $name to use the remote: no USB debugging needed."
+            Connection.Via.AUTO -> {
+                val adb = TvLink.check(context, host)
+                when {
+                    adb == TvLink.Adb.ALLOWED -> viaAdb() || (paired && viaPairing())
+                    paired -> viaPairing()
+                    // USB debugging off (a Google TV Streamer, most TVs): nothing to try but pairing.
+                    adb == TvLink.Adb.OFF -> error = "Pair with $name to use the remote: no USB debugging needed."
+                    !viaAdb() -> error = "Pair with $name to use the remote: no USB debugging needed."
+                }
             }
         }
     }
