@@ -670,7 +670,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                     when {
                         id != null -> { link = null; imdbId = id; keepType = false }
                         Links.isLink(v.trim()) -> { link = v.trim(); linkTitle = ""; recordLink = false; imdbId = "" }
-                        else -> { link = null; imdbId = v.trim(); keepType = false }
+                        else -> { link = null; imdbId = v; keepType = false }     // as typed: trimming ate the space between words
                     }
                 },
                 placeholder = { Text("Search a title, or paste a link") },
