@@ -8,7 +8,10 @@ import kotlinx.coroutines.withContext
  * page. Trakt's links say the type, season and episode, not the IMDb id: that's on the title's page (its IMDb link), or
  * else found by the name in the link, through Cinemeta's search.
  */
-object Trakt {
+object Trakt : TitleSource {
+    override val name = "Trakt"
+    override val key = "trakt"
+
     /** What a Trakt link points at: `slug` is Trakt's ("breaking-bad", "the-lord-of-the-rings-…-2001", or a number). */
     data class Ref(val slug: String, val series: Boolean, val season: Int? = null, val episode: Int? = null)
 
@@ -27,7 +30,7 @@ object Trakt {
         return Ref(slug, series, season.toIntOrNull()?.takeIf { series }, episode.toIntOrNull()?.takeIf { series })
     }
 
-    fun isTrakt(link: String) = parse(link) != null
+    override fun handles(link: String) = parse(link) != null
 
     /** The IMDb id on a title's Trakt page: its IMDb link, with the other sites it's on. */
     fun imdbIdIn(html: String): String? = IMDB_LINK.find(html)?.groupValues?.get(1)
@@ -39,18 +42,17 @@ object Trakt {
         return words to year
     }
 
-    /**
-     * Off the main thread. The title a Trakt link points at (season and episode from the link; the name left for
-     * Cinemeta), or null when it can't be found (no internet, or no IMDb id anywhere).
-     */
-    suspend fun resolve(link: String): Title? {
+    /** The title a Trakt link points at: season and episode from the link, the name left for Cinemeta. */
+    override suspend fun resolve(link: String): TitleSource.Found? {
         val ref = parse(link) ?: return null
         // The title's own page (an episode's links to the episode on IMDb; Nuvio wants the show's).
         val page = "https://trakt.tv/${if (ref.series) "shows" else "movies"}/${ref.slug}"
         val fromPage = withContext(Dispatchers.IO) { runCatching { Links.get(page, limit = 600_000)?.let(::imdbIdIn) }.getOrNull() }
         val id = fromPage ?: byName(ref) ?: return null
-        return Title(id, "", ref.series, ref.season ?: 1, ref.episode ?: 1)
+        return TitleSource.Found(Title(id, "", ref.series, ref.season ?: 1, ref.episode ?: 1), ref.episode != null)
     }
+
+    override fun searchFor(link: String): String? = parse(link)?.let { nameAndYear(it.slug).first }
 
     /** The slug's words searched in Cinemeta: the first of the right type (and year, when the slug has one). */
     private suspend fun byName(ref: Ref): String? {
