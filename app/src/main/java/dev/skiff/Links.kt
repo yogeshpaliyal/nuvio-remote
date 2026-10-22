@@ -87,7 +87,8 @@ object Links {
     private fun unescape(s: String) = s.replace("&amp;", "&").replace("&quot;", "\"").replace("&#39;", "'")
         .replace("&lt;", "<").replace("&gt;", ">")
 
-    private fun get(url: String, limit: Int = 200_000): String? {
+    /** A page's text (up to `limit` bytes), as a phone's browser asks for it; null when it doesn't answer 2xx. */
+    internal fun get(url: String, limit: Int = 200_000): String? {
         val c = URL(url).openConnection() as HttpURLConnection
         c.connectTimeout = 6000
         c.readTimeout = 8000

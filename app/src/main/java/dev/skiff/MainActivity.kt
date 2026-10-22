@@ -268,6 +268,10 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
     var linkAppsLoading by remember { mutableStateOf(false) }
     var linkComponent by remember { mutableStateOf(prefs.getString("linkApp", null)) }
     var linkRun by remember { mutableIntStateOf(0) }     // "Check again"
+    // A title page of another site (Trakt…, TitleSources): looked up (its IMDb id) before it's a title like any other;
+    // an episode's link says which one.
+    var sourceLink by remember { mutableStateOf<String?>(null) }
+    var episodeKnown by remember { mutableStateOf(false) }
 
     val hostOk = host.trim().isNotEmpty()
     val idOk = Title.isImdbId(imdbId)
@@ -407,6 +411,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
     fun pick(e: Library.Entry, play: Boolean, from: String) {
         showLibrary = false
         Telemetry.event(context, "open_entry", "kind" to (if (e.link != null) "link" else "title"), "play" to play, "from" to from)
+        sourceLink = null
         if (e.link != null) {
             link = e.link
             linkTitle = e.name
@@ -435,8 +440,21 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
         }
     }
 
-    // A shared IMDb page fills in the id (and the title, when the share says it).
-    if (shared != null && shared.link != null) {
+    // A shared IMDb page fills in the id (and the title, when the share says it); another site's, once it's looked up.
+    val sharedSource = shared?.link?.let(TitleSources::of)
+    if (shared != null && shared.link != null && sharedSource != null) {
+        Telemetry.event(context, "share", "kind" to sharedSource.key)
+        sourceLink = shared.link
+        link = null
+        imdbId = ""
+        name = ""
+        status = null
+        failed = false
+        openWhenKnown = true
+        shareRun++
+        onSharedUsed()
+    } else if (shared != null && shared.link != null) {
+        sourceLink = null
         Telemetry.event(context, "share", "kind" to "link", "site" to Links.site(shared.link))
         link = shared.link
         linkTitle = shared.name
@@ -449,6 +467,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
         onSharedUsed()
     } else if (shared != null) {
         Telemetry.event(context, "share", "kind" to "title")
+        sourceLink = null
         link = null
         imdbId = shared.imdbId
         if (shared.name.isNotEmpty()) {
@@ -505,8 +524,38 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
         }
     }
 
+    // Another site's page: its IMDb id (and the episode, from the link), then the title as if its IMDb page was shared.
+    // Not found: its name searched instead, the results under the box.
+    LaunchedEffect(sourceLink, shareRun) {
+        val l = sourceLink ?: return@LaunchedEffect
+        val source = TitleSources.of(l) ?: return@LaunchedEffect
+        if (!openWhenKnown) delay(600)     // typing: wait for the whole link
+        lookingUp = true
+        val found = try { source.resolve(l) } finally { lookingUp = false }
+        Telemetry.event(context, "source_lookup", "source" to source.key, "ok" to (found != null))
+        sourceLink = null
+        if (found == null) {
+            imdbId = source.searchFor(l).orEmpty()
+            openWhenKnown = false
+            status = "Couldn't find that ${source.name} page's title. Pick it below."
+            return@LaunchedEffect
+        }
+        val t = found.title
+        imdbId = t.imdbId
+        name = ""
+        autoName = true
+        series = t.series
+        keepType = true
+        season = t.season
+        episode = t.episode
+        episodeKnown = found.episodeKnown
+        shareRun++
+    }
+
     // The id gives the title, its art and whether it's a movie or a series (Cinemeta).
     LaunchedEffect(imdbId, shareRun) {
+        val knownEpisode = episodeKnown
+        episodeKnown = false
         notFound = false
         if (!Title.isImdbId(imdbId)) {
             meta = null
@@ -533,7 +582,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
         if (openWhenKnown) {
             openWhenKnown = false
             when {
-                found.series -> status = "Pick the season and episode, then play it."
+                found.series && !knownEpisode -> status = "Pick the season and episode, then play it."
                 hostOk && !busy -> openOnTv()
                 else -> status = "Pick your TV, then play it."
             }
@@ -677,11 +726,14 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                 Telemetry.event(context, "title_search", "results" to hits.size)
             }
             OutlinedTextField(
-                value = link ?: imdbId,
+                value = sourceLink ?: link ?: imdbId,
                 onValueChange = { v ->
-                    // An IMDb link or id: the Nuvio flow; any other link: the app on the TV that opens it.
+                    // Another site's title page, once looked up; an IMDb link or id: the Nuvio flow; any other link:
+                    // the app on the TV that opens it.
                     val id = Title.idIn(v)
+                    sourceLink = null
                     when {
+                        TitleSources.of(v) != null -> { link = null; imdbId = ""; sourceLink = v.trim(); openWhenKnown = false }
                         id != null -> { link = null; imdbId = id; keepType = false }
                         Links.isLink(v.trim()) -> { link = v.trim(); linkTitle = ""; recordLink = false; imdbId = "" }
                         else -> { link = null; imdbId = v; keepType = false }     // as typed: trimming ate the space between words
@@ -693,10 +745,11 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                 singleLine = true,
                 shape = MaterialTheme.shapes.extraLarge,
                 trailingIcon = {
-                    if (imdbId.isNotEmpty() || link != null) {
+                    if (imdbId.isNotEmpty() || link != null || sourceLink != null) {
                         // Start over: the box, the title or link found, its episode, and the last message.
                         IconButton(onClick = {
                     link = null
+                    sourceLink = null
                     linkTitle = ""
                     recordLink = false
                     page = null
@@ -721,11 +774,13 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                             clipboard.getText()?.text?.let { t ->
                                 val id = Title.idIn(t)
                                 val l = Links.linkIn(t)
+                                val source = l?.let(TitleSources::of)
                                 when {
+                                    source != null -> { link = null; imdbId = ""; sourceLink = l; openWhenKnown = false }
                                     id != null -> { link = null; imdbId = id; autoName = true; keepType = false }
                                     l != null -> { link = l; linkTitle = ""; recordLink = true; imdbId = "" }
                                 }
-                                Telemetry.event(context, "paste", "kind" to when { id != null -> "title"; l != null -> "link"; else -> "none" })
+                                Telemetry.event(context, "paste", "kind" to when { source != null -> source.key; id != null -> "title"; l != null -> "link"; else -> "none" })
                             }
                         }) { Text("Paste") }
                     }
@@ -746,6 +801,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                             autoName = true
                             keepType = false
                             hits = emptyList()
+                            status = null
                         }
                     }
                     findingTitles -> Row(verticalAlignment = Alignment.CenterVertically) {
