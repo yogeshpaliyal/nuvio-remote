@@ -109,4 +109,6 @@ dependencies {
     // Google Play's in-app updates: the play build only (the github one checks GitHub releases).
     "playImplementation"("com.google.android.play:app-update-ktx:2.1.0")
     testImplementation("junit:junit:4.13.2")
+    // Android's org.json, for tests on the JVM (its stub in android.jar does nothing): Cinemeta's answers.
+    testImplementation("org.json:json:20240303")
 }
