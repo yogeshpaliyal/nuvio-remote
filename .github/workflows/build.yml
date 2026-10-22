@@ -18,3 +18,5 @@ jobs:
       # A check that it builds; the APK to install comes from Releases (no artifact: storage is limited).
       - name: Build the debug APKs (github and play)
         run: ./gradlew assembleGithubDebug assemblePlayDebug
+      - name: Unit tests
+        run: ./gradlew testGithubDebugUnitTest

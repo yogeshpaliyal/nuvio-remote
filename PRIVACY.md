@@ -19,8 +19,8 @@ None of this leaves the phone, except to your TV when you send something.
 - **Cinemeta** (`v3-cinemeta.strem.io`): the IMDb id of a title you share, for its name, art and type; and the words
   you type in the search box (not a link or an IMDb id), to find matching titles. Nothing else goes with them.
 - **The page you share**: Skiff reads its title and picture (as a browser would).
-- **Trakt** (`trakt.tv`): for a Trakt link you share or paste, Skiff opens that title's Trakt page (as a browser would)
-  to read its IMDb id. When that fails, the words of the link's name go to Cinemeta's search.
+- **Trakt, Simkl, Letterboxd, MDBList, WeTrakr**: for one of their links you share or paste, Skiff opens that title's
+  page there (as a browser would) to read its IMDb id. When that fails, the title's name goes to Cinemeta's search.
 - **Link rules**: once a day, Skiff downloads [rules.json](app/src/main/assets/rules.json) from this repository.
 - **Updates**: about twice a day, Skiff asks GitHub (`api.github.com`) for its latest release, to tell you when there's
   a newer version. Nothing about you goes with it.
