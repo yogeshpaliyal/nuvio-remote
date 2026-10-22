@@ -52,7 +52,10 @@ object Atv {
     private const val PREFS = "atv"
 
     /** The TV refused the phone: not paired (or the TV forgot it). */
-    class NotPaired(message: String) : Exception(message)
+    class NotPaired(message: String, cause: Throwable? = null) : Exception(message, cause)
+
+    /** The TV didn't answer the remote in time (asleep, another network, a firewall): pairing again won't help. */
+    class NoAnswer(message: String, cause: Throwable? = null) : Exception(message, cause)
 
     // MARK: Pairing
 
@@ -304,17 +307,25 @@ object Atv {
         val pinned = prefs(context).getString(key(host), null) ?: throw NotPaired("Not paired with this TV yet.")
         val socket = try {
             open(context, host, REMOTE_PORT, pinned)
+        } catch (e: java.net.SocketTimeoutException) {
+            throw NoAnswer("The TV didn't answer. Check it's on (not asleep), and on the same network as this phone.", e)
+        } catch (e: java.net.ConnectException) {
+            throw NoAnswer("Couldn't reach the TV's remote service. Check it's on, and on the same network as this phone.", e)
         } catch (e: javax.net.ssl.SSLException) {
-            throw NotPaired("The TV didn't accept this phone: pair again. (${e.message})")
+            throw NotPaired("The TV didn't accept this phone: pair again. (${e.message})", e)
         }
         socket.soTimeout = 0     // the TV pings every few seconds; quiet otherwise
         val remote = Remote(socket)
         remote.start()
         try {
             remote.awaitStarted()
+        } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+            // Connected, but the TV never said the remote started: it's busy or asleep, not refusing this phone.
+            remote.close()
+            throw NoAnswer("The TV connected but didn't start the remote. Wake it up, then try again.", e)
         } catch (e: Exception) {
             remote.close()
-            throw NotPaired("The TV didn't start the remote: pair again. (${e.message ?: e.javaClass.simpleName})")
+            throw NotPaired("The TV didn't start the remote: pair again. (${e.message ?: e.javaClass.simpleName})", e)
         }
         remote
     }

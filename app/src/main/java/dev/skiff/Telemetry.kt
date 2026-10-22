@@ -54,9 +54,11 @@ object Telemetry {
      */
     fun error(context: Context, where: String, e: Throwable) {
         if (!available(context) || !enabled(context) || Demo.on) return
-        event(context, "app_error", "where" to where, "error" to e.javaClass.simpleName)
+        // The cause's class too (a wrapped SocketTimeoutException, SSLHandshakeException…): what actually failed.
+        val cause = e.cause?.let { " < ${it.javaClass.simpleName}" } ?: ""
+        event(context, "app_error", "where" to where, "error" to e.javaClass.simpleName + cause)
         FirebaseCrashlytics.getInstance().recordException(
-            RuntimeException("$where: ${e.javaClass.name}").apply { stackTrace = e.stackTrace },
+            RuntimeException("$where: ${e.javaClass.name}$cause").apply { stackTrace = e.stackTrace },
         )
     }
 
