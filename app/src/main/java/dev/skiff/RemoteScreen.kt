@@ -138,6 +138,7 @@ fun RemoteScreen(host: String, tvName: String, onBack: () -> Unit) {
             true
         } catch (e: Exception) {
             error = "Couldn't reach $name over USB debugging: ${e.message ?: e.javaClass.simpleName}"
+            Telemetry.error(context, "remote_connect_adb", e)
             false
         }
         suspend fun viaPairing(): Boolean = try {
@@ -149,6 +150,7 @@ fun RemoteScreen(host: String, tvName: String, onBack: () -> Unit) {
             true
         } catch (e: Exception) {
             error = e.message ?: "Pair with $name to use the remote."
+            Telemetry.error(context, "remote_connect_pairing", e)
             false
         }
         val paired = Atv.isPaired(context, host)
@@ -212,6 +214,7 @@ fun RemoteScreen(host: String, tvName: String, onBack: () -> Unit) {
                 r.key(code)
                 ActivityLog.add(context, keyName(code), via)
             } catch (e: Exception) {
+                Telemetry.error(context, "remote_key", e)
                 reconnect(code)
             }
         }
@@ -242,8 +245,8 @@ fun RemoteScreen(host: String, tvName: String, onBack: () -> Unit) {
         view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
         scope.launch {
             runCatching { r.text(t) }
-                .onSuccess { typed = ""; ActivityLog.add(context, "Typed “$t”", via) }
-                .onFailure { ActivityLog.add(context, "Typed “$t”", via, ok = false) }
+                .onSuccess { typed = ""; ActivityLog.add(context, "Typed “$t”", via); Telemetry.event(context, "remote_type", "ok" to true) }
+                .onFailure { ActivityLog.add(context, "Typed “$t”", via, ok = false); Telemetry.event(context, "remote_type", "ok" to false); Telemetry.error(context, "remote_type", it) }
         }
     }
 

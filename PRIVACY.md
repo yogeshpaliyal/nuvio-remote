@@ -23,11 +23,15 @@ None of this leaves the phone, except to your TV when you send something.
 - **Updates**: about twice a day, Skiff asks GitHub (`api.github.com`) for its latest release, to tell you when there's
   a newer version. Nothing about you goes with it.
 - **Firebase Crashlytics** (Google): when Skiff crashes, the crash report (stack trace, device model, Android
-  version, app version).
+  version, app version); and when something fails without crashing (reaching the TV, an update, the link rules),
+  where it failed, the kind of error and its stack trace, without the error's message.
 - **Firebase Analytics** (Google): which screens are opened, and whether opening a link, playing a title,
-  connecting the remote, pairing, an ADB command or an APK install worked; how it went (pairing or USB debugging);
-  for a link, its site (for example `youtube.com`). Firebase adds an app-instance id, device model, Android version,
-  country and app version. **Never** titles, links, text you type, or commands.
+  connecting the remote, pairing, typing on the TV, an ADB command or an APK install worked; how it went (pairing
+  or USB debugging); for a link, its site (for example `youtube.com`). Also which features are used: sharing to
+  Skiff, pasting, a title search (how many titles it found, and which place in the list you picked), finding a
+  title on Cinemeta, picking a TV, saving, editing or removing an entry, and the update prompt; and where something
+  failed, with the kind of error. Firebase adds an app-instance id, device model, Android version, country and app
+  version. **Never** titles, links, text you type or search for, TV addresses, or commands.
 
 Crashlytics and Analytics are on by default; **Settings → Privacy → Share crash reports and usage** turns both off.
 

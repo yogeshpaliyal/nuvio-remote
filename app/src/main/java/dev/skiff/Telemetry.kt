@@ -48,6 +48,18 @@ object Telemetry {
         FirebaseAnalytics.getInstance(context).logEvent(name, b)
     }
 
+    /**
+     * Something that failed and was handled: an `app_error` event (where, and the exception's class), and a
+     * Crashlytics non-fatal with its stack trace. Never the message: it can hold a link, a TV's address or a command.
+     */
+    fun error(context: Context, where: String, e: Throwable) {
+        if (!available(context) || !enabled(context) || Demo.on) return
+        event(context, "app_error", "where" to where, "error" to e.javaClass.simpleName)
+        FirebaseCrashlytics.getInstance().recordException(
+            RuntimeException("$where: ${e.javaClass.name}").apply { stackTrace = e.stackTrace },
+        )
+    }
+
     /** A debug build (the test crash is only there). */
     fun debuggable(context: Context) = (context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
 

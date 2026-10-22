@@ -138,6 +138,7 @@ fun SettingsScreen(host: String, tvName: String, onBack: () -> Unit, startOnActi
                 output = "Couldn't reach $tvLabel: ${e.message ?: e.javaClass.simpleName}"
                 ActivityLog.add(context, "Command: $c", "USB debugging", ok = false)
                 Telemetry.event(context, "adb_command", "ok" to false)
+                Telemetry.error(context, "adb_command", e)
             } finally {
                 running = false
                 recent = rememberCommand(context, c)
@@ -166,6 +167,7 @@ fun SettingsScreen(host: String, tvName: String, onBack: () -> Unit, startOnActi
                 installNote = "Couldn't install $name: ${e.message ?: e.javaClass.simpleName}"
                 ActivityLog.add(context, "Install $name", "USB debugging", ok = false)
                 Telemetry.event(context, "apk_install", "ok" to false)
+                Telemetry.error(context, "apk_install", e)
             } finally {
                 withContext(Dispatchers.IO) { apk.delete() }
                 installing = false
@@ -385,6 +387,7 @@ fun SettingsScreen(host: String, tvName: String, onBack: () -> Unit, startOnActi
                             checkNote = try {
                                 if (Updates.check(context, force = true) == null) "You have the latest version." else null
                             } catch (e: Exception) {
+                                Telemetry.error(context, "update_check", e)
                                 "Couldn't check: ${e.message ?: e.javaClass.simpleName}"
                             }
                             checking = false

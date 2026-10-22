@@ -29,6 +29,7 @@ internal object StoreUpdates {
             manager.requestAppUpdateInfo()
         } catch (e: Exception) {
             if (force) throw IllegalStateException("Google Play didn't answer: is Skiff installed from Play?", e)
+            Telemetry.error(context, "update_check", e)
             return null
         }
         // Downloaded earlier and not installed yet: finish it now.
