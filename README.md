@@ -9,9 +9,8 @@ Send what you found on your phone to your Android TV / Google TV: share a page t
 - **An IMDb page** (from Chrome or the IMDb app) opens in [Nuvio](https://github.com/NuvioMedia/NuvioTV): on that
   title's stream picker over USB debugging (for a series, pick the season and episode, then **Play**), or on its page
   when paired. Or in [Stremio](https://www.stremio.com), at the streams: pick it under **Open with**.
-- **A Trakt, Simkl, Letterboxd, MDBList or WeTrakr page** (a movie, a show, or one episode of it) opens the same
-  way: Skiff finds its IMDb id on the page (or, failing that, searches its name), and an episode's link goes straight
-  to that episode.
+- **A Trakt page** (a movie, a show, or one episode of it) opens the same way: Skiff finds its IMDb id on the Trakt
+  page (or, failing that, searches its name), and an episode's link goes straight to that episode.
 - **Any other link** (JioHotstar, YouTube, Netflix, Prime Video, Stremio…) opens in the TV app that opens such links, when the TV has one. How each
   kind of link opens is set by [link rules](RULES.md): a fix there reaches the app without a new release.
 
