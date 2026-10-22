@@ -105,7 +105,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.skiff.atv.Atv
-import dev.skiff.providers.Providers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -269,9 +268,8 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
     var linkAppsLoading by remember { mutableStateOf(false) }
     var linkComponent by remember { mutableStateOf(prefs.getString("linkApp", null)) }
     var linkRun by remember { mutableIntStateOf(0) }     // "Check again"
-    // A title site's page (Trakt…: Providers): looked up (its IMDb id) before it's a title like any other; an episode's
-    // link says which one.
-    var providerLink by remember { mutableStateOf<String?>(null) }
+    // A Trakt page: looked up (its IMDb id) before it's a title like any other; an episode's link says which one.
+    var trakt by remember { mutableStateOf<String?>(null) }
     var episodeKnown by remember { mutableStateOf(false) }
 
     val hostOk = host.trim().isNotEmpty()
@@ -412,7 +410,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
     fun pick(e: Library.Entry, play: Boolean, from: String) {
         showLibrary = false
         Telemetry.event(context, "open_entry", "kind" to (if (e.link != null) "link" else "title"), "play" to play, "from" to from)
-        providerLink = null
+        trakt = null
         if (e.link != null) {
             link = e.link
             linkTitle = e.name
@@ -441,12 +439,10 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
         }
     }
 
-    // A shared IMDb page fills in the id (and the title, when the share says it); a title site's page, once it's looked
-    // up.
-    val sharedProvider = Providers.forLink(shared?.link)
-    if (shared != null && shared.link != null && sharedProvider != null) {
-        Telemetry.event(context, "share", "kind" to "provider", "site" to sharedProvider.id)
-        providerLink = shared.link
+    // A shared IMDb page fills in the id (and the title, when the share says it); a Trakt page, once it's looked up.
+    if (shared != null && shared.link != null && Trakt.isTrakt(shared.link)) {
+        Telemetry.event(context, "share", "kind" to "trakt")
+        trakt = shared.link
         link = null
         imdbId = ""
         name = ""
@@ -456,7 +452,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
         shareRun++
         onSharedUsed()
     } else if (shared != null && shared.link != null) {
-        providerLink = null
+        trakt = null
         Telemetry.event(context, "share", "kind" to "link", "site" to Links.site(shared.link))
         link = shared.link
         linkTitle = shared.name
@@ -469,7 +465,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
         onSharedUsed()
     } else if (shared != null) {
         Telemetry.event(context, "share", "kind" to "title")
-        providerLink = null
+        trakt = null
         link = null
         imdbId = shared.imdbId
         if (shared.name.isNotEmpty()) {
@@ -526,23 +522,21 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
         }
     }
 
-    // A title site's page: its IMDb id (and the episode, when the link says), then the title as if its IMDb page was
-    // shared. Not found: its name searched instead, the results under the box.
-    LaunchedEffect(providerLink, shareRun) {
-        val l = providerLink ?: return@LaunchedEffect
-        val provider = Providers.forLink(l) ?: return@LaunchedEffect
+    // A Trakt page: its IMDb id (and the episode, from the link), then the title as if its IMDb page was shared. Not
+    // found: its name searched instead, the results under the box.
+    LaunchedEffect(trakt, shareRun) {
+        val l = trakt ?: return@LaunchedEffect
         if (!openWhenKnown) delay(600)     // typing: wait for the whole link
         lookingUp = true
-        val found = try { provider.resolve(l) } finally { lookingUp = false }
-        Telemetry.event(context, "provider_lookup", "site" to provider.id, "ok" to (found != null))
-        providerLink = null
-        if (found == null) {
-            imdbId = provider.searchWords(l).orEmpty()
+        val t = try { Trakt.resolve(l) } finally { lookingUp = false }
+        Telemetry.event(context, "trakt_lookup", "ok" to (t != null))
+        trakt = null
+        if (t == null) {
+            imdbId = Trakt.parse(l)?.let { Trakt.nameAndYear(it.slug).first }.orEmpty()
             openWhenKnown = false
-            status = "Couldn't find that ${provider.name} page's title. Pick it below."
+            status = "Couldn't find that Trakt page's title. Pick it below."
             return@LaunchedEffect
         }
-        val t = found.title
         imdbId = t.imdbId
         name = ""
         autoName = true
@@ -550,7 +544,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
         keepType = true
         season = t.season
         episode = t.episode
-        episodeKnown = found.episode
+        episodeKnown = Trakt.parse(l)?.episode != null
         shareRun++
     }
 
@@ -728,15 +722,15 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                 Telemetry.event(context, "title_search", "results" to hits.size)
             }
             OutlinedTextField(
-                value = providerLink ?: link ?: imdbId,
+                value = trakt ?: link ?: imdbId,
                 onValueChange = { v ->
-                    // An IMDb link or id: the Nuvio flow; a title site's link (Trakt…), once looked up; any other
-                    // link: the app on the TV that opens it.
+                    // An IMDb link or id: the Nuvio flow; a Trakt link, once looked up; any other link: the app on
+                    // the TV that opens it.
                     val id = Title.idIn(v)
-                    providerLink = null
+                    trakt = null
                     when {
                         id != null -> { link = null; imdbId = id; keepType = false }
-                        Providers.forLink(v) != null -> { link = null; imdbId = ""; providerLink = v.trim(); openWhenKnown = false }
+                        Trakt.isTrakt(v) -> { link = null; imdbId = ""; trakt = v.trim(); openWhenKnown = false }
                         Links.isLink(v.trim()) -> { link = v.trim(); linkTitle = ""; recordLink = false; imdbId = "" }
                         else -> { link = null; imdbId = v; keepType = false }     // as typed: trimming ate the space between words
                     }
@@ -747,11 +741,11 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                 singleLine = true,
                 shape = MaterialTheme.shapes.extraLarge,
                 trailingIcon = {
-                    if (imdbId.isNotEmpty() || link != null || providerLink != null) {
+                    if (imdbId.isNotEmpty() || link != null || trakt != null) {
                         // Start over: the box, the title or link found, its episode, and the last message.
                         IconButton(onClick = {
                     link = null
-                    providerLink = null
+                    trakt = null
                     linkTitle = ""
                     recordLink = false
                     page = null
@@ -778,10 +772,10 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                                 val l = Links.linkIn(t)
                                 when {
                                     id != null -> { link = null; imdbId = id; autoName = true; keepType = false }
-                                    Providers.forLink(l) != null -> { link = null; imdbId = ""; providerLink = l; openWhenKnown = false }
+                                    l != null && Trakt.isTrakt(l) -> { link = null; imdbId = ""; trakt = l; openWhenKnown = false }
                                     l != null -> { link = l; linkTitle = ""; recordLink = true; imdbId = "" }
                                 }
-                                Telemetry.event(context, "paste", "kind" to when { id != null -> "title"; Providers.forLink(l) != null -> "provider"; l != null -> "link"; else -> "none" })
+                                Telemetry.event(context, "paste", "kind" to when { id != null -> "title"; l != null && Trakt.isTrakt(l) -> "trakt"; l != null -> "link"; else -> "none" })
                             }
                         }) { Text("Paste") }
                     }
