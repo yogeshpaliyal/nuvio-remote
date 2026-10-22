@@ -66,6 +66,7 @@ fun PairCard(
                 code = ""
             } catch (e: Exception) {
                 note = "Couldn't start pairing: ${e.message ?: e.javaClass.simpleName}"
+                Telemetry.error(context, "pair_start", e)
             } finally {
                 busy = false
             }
@@ -85,9 +86,13 @@ fun PairCard(
                         Telemetry.event(context, "pair")
                         onPaired()
                     }
-                    Atv.Pairing.Result.MISTYPED -> note = "That code doesn't match: check it on the TV."
+                    Atv.Pairing.Result.MISTYPED -> {
+                        note = "That code doesn't match: check it on the TV."
+                        Telemetry.event(context, "pair_failed", "reason" to "mistyped")
+                    }
                     Atv.Pairing.Result.REFUSED -> {
                         pairing = null
+                        Telemetry.event(context, "pair_failed", "reason" to "refused")
                         note = "The TV didn't accept it. Pair again."
                     }
                 }

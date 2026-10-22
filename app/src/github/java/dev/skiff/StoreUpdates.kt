@@ -34,6 +34,7 @@ internal object StoreUpdates {
                 parse(json)
             } catch (e: Exception) {
                 if (force) throw e
+                Telemetry.error(context, "update_check", e)
                 cached
             }
         }
@@ -68,6 +69,7 @@ internal object StoreUpdates {
             install(context, apk)
         } catch (e: Exception) {
             progress.value = Updates.Progress.Problem("Couldn't update: ${e.message ?: e.javaClass.simpleName}")
+            Telemetry.error(context, "update_install", e)
         }
     }
 

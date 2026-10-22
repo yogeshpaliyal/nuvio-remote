@@ -66,6 +66,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -82,6 +83,7 @@ fun LibraryScreen(
     onOpen: (Library.Entry) -> Unit,
     onPlay: (Library.Entry) -> Unit,
 ) {
+    val context = LocalContext.current
     val entries by library.entries.collectAsState()
     var tab by remember { mutableIntStateOf(0) }
     var editing by remember { mutableStateOf<Library.Entry?>(null) }
@@ -93,13 +95,17 @@ fun LibraryScreen(
 
     fun remove(e: Library.Entry) {
         if (tab == 0) library.removeFromHistory(e.imdbId) else library.setSaved(e.title(), null, false)
+        Telemetry.event(context, "remove_entry", "tab" to (if (tab == 0) "history" else "saved"))
         scope.launch {
             snackbar.currentSnackbarData?.dismiss()
             val r = snackbar.showSnackbar(
                 "Removed “${e.name}”" + if (tab == 0) " from history" else " from saved",
                 actionLabel = "Undo", withDismissAction = true,
             )
-            if (r == SnackbarResult.ActionPerformed) library.restore(e)
+            if (r == SnackbarResult.ActionPerformed) {
+                library.restore(e)
+                Telemetry.event(context, "undo_remove")
+            }
         }
     }
 
@@ -155,7 +161,10 @@ fun LibraryScreen(
                                 e,
                                 onOpen = { onOpen(e) },
                                 onPlay = { onPlay(e) },
-                                onToggleSaved = { library.setSaved(e.title(), null, !e.saved) },
+                                onToggleSaved = {
+                                    library.setSaved(e.title(), null, !e.saved)
+                                    Telemetry.event(context, "save", "kind" to (if (e.link != null) "link" else "title"), "on" to !e.saved, "from" to "library")
+                                },
                                 onEdit = { editing = e },
                                 onRemove = { remove(e) },
                                 removeLabel = if (tab == 0) "Remove from history" else "Remove from saved",
@@ -168,7 +177,7 @@ fun LibraryScreen(
     }
 
     editing?.let { e ->
-        EditDialog(e, onDismiss = { editing = null }, onSave = { library.edit(it); editing = null })
+        EditDialog(e, onDismiss = { editing = null }, onSave = { library.edit(it); editing = null; Telemetry.event(context, "edit_entry") })
     }
 }
 

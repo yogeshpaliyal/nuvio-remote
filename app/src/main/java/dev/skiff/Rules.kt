@@ -99,7 +99,7 @@ object Rules {
                 File(cache.path + ".tmp").apply { writeText(text) }.renameTo(cache)
                 current = fresh
             }
-        }
+        }.onFailure { Telemetry.error(context, "rules_refresh", it) }
     }
 
     /** The first rule for this link, or null. */

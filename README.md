@@ -97,10 +97,10 @@ build* 7 times; then Developer options → turn on **USB debugging**, and allow 
 
 ## Privacy
 
-Skiff sends crash reports (Firebase Crashlytics) and usage (Firebase Analytics): which screens are opened, and
-whether opening a link, playing a title, connecting the remote, pairing, an ADB command or an APK install worked,
-with how (pairing or USB debugging) and, for links, the site (youtube.com). Never titles, links, typed text or
-commands. **Settings → Privacy** turns both off. Titles' names and art come from Cinemeta; history stays on the phone.
+Skiff sends crash reports and errors (Firebase Crashlytics) and usage (Firebase Analytics): which screens and
+features are used, whether opening a link, playing a title, connecting the remote, pairing, an ADB command or an APK
+install worked, with how (pairing or USB debugging) and, for links, the site (youtube.com); and where something
+failed, with the kind of error. Never titles, links, typed or searched text, or commands. **Settings → Privacy** turns both off. Titles' names and art come from Cinemeta; history stays on the phone.
 Details: [PRIVACY.md](PRIVACY.md).
 
 ## Download

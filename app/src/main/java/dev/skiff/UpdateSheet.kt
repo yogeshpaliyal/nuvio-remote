@@ -74,10 +74,11 @@ fun UpdateSheet(r: Updates.Release, onDismiss: () -> Unit) {
             }
             val busy = progress is Updates.Progress.Downloading || progress == Updates.Progress.Installing
             Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
-                TextButton(onClick = { Updates.later(context, r); onDismiss() }, enabled = !busy) { Text("Later") }
+                TextButton(onClick = { Updates.later(context, r); onDismiss(); Telemetry.event(context, "update_later") }, enabled = !busy) { Text("Later") }
                 Spacer(Modifier.width(8.dp))
                 Button(
                     onClick = {
+                        Telemetry.event(context, "update_start", "retry" to (progress is Updates.Progress.Problem))
                         scope.launch { Updates.open(context, r) }
                         if (fromPlay) onDismiss()
                     },

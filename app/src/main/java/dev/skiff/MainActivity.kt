@@ -321,6 +321,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
             if (found.isEmpty()) appsError = "There's no Nuvio or Stremio app on $tvLabel. Install one, then check again."
         } catch (e: Exception) {
             appsError = "Couldn't reach $tvLabel: ${e.message ?: e.javaClass.simpleName}"
+            Telemetry.error(context, "tv_apps", e)
         } finally {
             appsLoading = false
         }
@@ -345,6 +346,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
             } catch (e: Exception) {
                 ActivityLog.add(context, "Link ${Links.site(l)}", if (byPairing) "Pairing" else "USB debugging", ok = false)
                 Telemetry.event(context, "open_link", "site" to Links.site(l), "via" to (if (byPairing) "pairing" else "adb"), "ok" to false)
+                Telemetry.error(context, "open_link", e)
                 failed = true
                 status = "Couldn't open it: ${e.message ?: e.javaClass.simpleName}"
             } finally {
@@ -389,6 +391,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
             } catch (e: Exception) {
                 ActivityLog.add(context, "$titleApp “${name.trim().ifEmpty { imdbId }}”", via, ok = false)
                 Telemetry.event(context, "play_title", "via" to (if (byPairing) "pairing" else "adb"), "series" to series, "ok" to false)
+                Telemetry.error(context, "play_title", e)
                 failed = true
                 status = "Couldn't open it: ${e.message ?: e.javaClass.simpleName}"
             } finally {
@@ -397,9 +400,13 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
         }
     }
 
-    /** An entry from the library back in the remote, as it was used (or edited); `play`: straight to the TV. */
-    fun pick(e: Library.Entry, play: Boolean) {
+    /**
+     * An entry from the library back in the remote, as it was used (or edited); `play`: straight to the TV. `from`:
+     * "recent" (under the search box) or "library".
+     */
+    fun pick(e: Library.Entry, play: Boolean, from: String) {
         showLibrary = false
+        Telemetry.event(context, "open_entry", "kind" to (if (e.link != null) "link" else "title"), "play" to play, "from" to from)
         if (e.link != null) {
             link = e.link
             linkTitle = e.name
@@ -430,6 +437,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
 
     // A shared IMDb page fills in the id (and the title, when the share says it).
     if (shared != null && shared.link != null) {
+        Telemetry.event(context, "share", "kind" to "link", "site" to Links.site(shared.link))
         link = shared.link
         linkTitle = shared.name
         recordLink = true
@@ -440,6 +448,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
         shareRun++
         onSharedUsed()
     } else if (shared != null) {
+        Telemetry.event(context, "share", "kind" to "title")
         link = null
         imdbId = shared.imdbId
         if (shared.name.isNotEmpty()) {
@@ -486,6 +495,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
         } catch (e: Exception) {
             failed = true
             status = "Couldn't reach $tvLabel: ${e.message ?: e.javaClass.simpleName}"
+            Telemetry.error(context, "link_apps", e)
         } finally {
             linkAppsLoading = false
         }
@@ -507,6 +517,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
         val found = Meta.lookup(imdbId)
         lookingUp = false
         meta = found
+        Telemetry.event(context, "title_lookup", "ok" to (found != null))
         if (found == null) {
             notFound = true
             editName = true
@@ -544,7 +555,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
     // 0: send, 1: library, 2: remote
     AnimatedContent(targetState = if (showLibrary) 1 else if (showRemote) 2 else if (showSettings) 3 else 0, label = "screen") { screen ->
     if (screen == 1) {
-        LibraryScreen(library, onBack = { showLibrary = false }, onOpen = { pick(it, false) }, onPlay = { pick(it, true) })
+        LibraryScreen(library, onBack = { showLibrary = false }, onOpen = { pick(it, false, "library") }, onPlay = { pick(it, true, "library") })
         return@AnimatedContent
     }
     if (screen == 2) {
@@ -661,6 +672,8 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                 findingTitles = true
                 hits = Meta.search(query)
                 findingTitles = false
+                // How many were found, never what was typed.
+                Telemetry.event(context, "title_search", "results" to hits.size)
             }
             OutlinedTextField(
                 value = link ?: imdbId,
@@ -700,6 +713,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                     status = null
                     failed = false
                     hits = emptyList()
+                    Telemetry.event(context, "clear_input")
                         }) { Icon(Icons.Rounded.Close, "Clear") }
                     } else {
                         TextButton(onClick = {
@@ -710,6 +724,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                                     id != null -> { link = null; imdbId = id; autoName = true; keepType = false }
                                     l != null -> { link = l; linkTitle = ""; recordLink = true; imdbId = "" }
                                 }
+                                Telemetry.event(context, "paste", "kind" to when { id != null -> "title"; l != null -> "link"; else -> "none" })
                             }
                         }) { Text("Paste") }
                     }
@@ -721,8 +736,9 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
             // A search: the titles found, one tap fills it in (as a shared IMDb page does).
             if (query.length >= 2) {
                 when {
-                    hits.isNotEmpty() -> for (h in hits) {
+                    hits.isNotEmpty() -> for ((i, h) in hits.withIndex()) {
                         SearchHitRow(h) {
+                            Telemetry.event(context, "search_pick", "position" to i, "series" to h.series)
                             imdbId = h.imdbId
                             name = h.name
                             series = h.series
@@ -753,9 +769,12 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                 for (e in recent) {
                     EntryRow(
                         e,
-                        onOpen = { pick(e, false) },
-                        onPlay = { pick(e, true) },
-                        onToggleSaved = { library.setSaved(e.title(), null, !e.saved) },
+                        onOpen = { pick(e, false, "recent") },
+                        onPlay = { pick(e, true, "recent") },
+                        onToggleSaved = {
+                            library.setSaved(e.title(), null, !e.saved)
+                            Telemetry.event(context, "save", "kind" to (if (e.link != null) "link" else "title"), "on" to !e.saved, "from" to "recent")
+                        },
                     )
                 }
             }
@@ -768,6 +787,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                     checked = savedNow,
                     onCheckedChange = { on ->
                         library.setLinkSaved(l, page, linkApps.firstOrNull { it.component == linkComponent }?.name, on)
+                        Telemetry.event(context, "save", "kind" to "link", "on" to on, "from" to "send")
                     },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
@@ -794,6 +814,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                     checked = savedNow,
                     onCheckedChange = { on ->
                         library.setSaved(Title(imdbId, name.ifBlank { meta?.name.orEmpty() }, series, season, episode), meta, on)
+                        Telemetry.event(context, "save", "kind" to "title", "on" to on, "from" to "send")
                     },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
@@ -949,6 +970,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                             tvName = tv.name
                             manual = false
                             showTvSheet = false
+                            Telemetry.event(context, "pick_tv", "found" to tvs.size, "ready" to tv.ready, "paired" to Atv.isPaired(context, tv.host))
                         },
                     )
                 }
@@ -966,7 +988,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                     )
                 }
                 if (!manual && tvs.any { it.ready }) {
-                    TextButton(onClick = { manual = true }) { Text("Enter an address instead") }
+                    TextButton(onClick = { manual = true; Telemetry.event(context, "manual_address") }) { Text("Enter an address instead") }
                 }
 
             }
