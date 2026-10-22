@@ -23,8 +23,8 @@ None of this leaves the phone, except to your TV when you send something.
   to read its IMDb id. When that fails, the words of the link's name go to Cinemeta's search.
 - **Simkl** (`api.simkl.com`), **Letterboxd** (`letterboxd.com`, `boxd.it`) and **WeTrakr** (`wetrakr.com`): the same,
   for their links: Skiff asks that site for the title's IMDb id, sending only the id or name in the link. Simkl's and
-  Letterboxd's, when that fails, go to Cinemeta's search by name. An **MDBList** link has the IMDb id in it: nothing
-  is sent to MDBList.
+  Letterboxd's, when that fails, go to Cinemeta's search by name. An **MDBList** link has the IMDb id in it, or else a
+  name that goes to Cinemeta's search: nothing is sent to MDBList.
 - **Link rules**: once a day, Skiff downloads [rules.json](app/src/main/assets/rules.json) from this repository.
 - **Updates**: about twice a day, Skiff asks GitHub (`api.github.com`) for its latest release, to tell you when there's
   a newer version. Nothing about you goes with it.
