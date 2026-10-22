@@ -30,6 +30,8 @@ class TitleSourcesLiveTest {
 
     @Test fun mdblist() {
         assertEquals(TitleSource.Found(Title("tt0903747", "", true)), found("https://mdblist.com/show/tt0903747"))
+        // As the site links it, with MDBList's own id.
+        assertEquals(TitleSource.Found(Title("tt11540908", "", true)), found("https://mdblist.com/show/3xzbl-carrie"))
     }
 
     @Test fun wetrakr() {
