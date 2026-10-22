@@ -728,13 +728,13 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
             OutlinedTextField(
                 value = sourceLink ?: link ?: imdbId,
                 onValueChange = { v ->
-                    // An IMDb link or id: the Nuvio flow; another site's title page, once looked up; any other link:
+                    // Another site's title page, once looked up; an IMDb link or id: the Nuvio flow; any other link:
                     // the app on the TV that opens it.
                     val id = Title.idIn(v)
                     sourceLink = null
                     when {
-                        id != null -> { link = null; imdbId = id; keepType = false }
                         TitleSources.of(v) != null -> { link = null; imdbId = ""; sourceLink = v.trim(); openWhenKnown = false }
+                        id != null -> { link = null; imdbId = id; keepType = false }
                         Links.isLink(v.trim()) -> { link = v.trim(); linkTitle = ""; recordLink = false; imdbId = "" }
                         else -> { link = null; imdbId = v; keepType = false }     // as typed: trimming ate the space between words
                     }
@@ -776,11 +776,11 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                                 val l = Links.linkIn(t)
                                 val source = l?.let(TitleSources::of)
                                 when {
-                                    id != null -> { link = null; imdbId = id; autoName = true; keepType = false }
                                     source != null -> { link = null; imdbId = ""; sourceLink = l; openWhenKnown = false }
+                                    id != null -> { link = null; imdbId = id; autoName = true; keepType = false }
                                     l != null -> { link = l; linkTitle = ""; recordLink = true; imdbId = "" }
                                 }
-                                Telemetry.event(context, "paste", "kind" to when { id != null -> "title"; source != null -> source.key; l != null -> "link"; else -> "none" })
+                                Telemetry.event(context, "paste", "kind" to when { source != null -> source.key; id != null -> "title"; l != null -> "link"; else -> "none" })
                             }
                         }) { Text("Paste") }
                     }

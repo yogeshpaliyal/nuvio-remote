@@ -40,9 +40,11 @@ data class Title(
          */
         fun fromShared(text: String?, subject: String?): Shared? {
             val all = listOfNotNull(subject, text).joinToString("\n")
-            val id = idIn(all) ?: return Links.linkIn(all)?.let { link ->
-                Shared("", subject?.lines()?.firstOrNull { it.isNotBlank() }?.trim().orEmpty(), null, link)
-            }
+            // Another site's title page (TitleSources), even one with the IMDb id in it (MDBList's): looked up.
+            val link = Links.linkIn(all)
+            val shared = { l: String -> Shared("", subject?.lines()?.firstOrNull { it.isNotBlank() }?.trim().orEmpty(), null, l) }
+            if (link != null && TitleSources.of(link) != null) return shared(link)
+            val id = idIn(all) ?: return link?.let(shared)
             val name = listOfNotNull(subject, text)
                 .flatMap { it.lines() }
                 .map { it.trim() }

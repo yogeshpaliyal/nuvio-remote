@@ -26,12 +26,12 @@ class TraktTest {
 
     @Test fun findsTheImdbIdOnThePage() {
         val html = """<a href="https://trakt.tv/movies/x/watch">Watch</a><a id="external-link-imdb" href="https://www.imdb.com/title/tt0120737/">IMDB</a>"""
-        assertEquals("tt0120737", Trakt.imdbIdIn(html))
-        assertNull(Trakt.imdbIdIn("<html>No links</html>"))
+        assertEquals("tt0120737", TitleSources.imdbLinkIn(html))
+        assertNull(TitleSources.imdbLinkIn("<html>No links</html>"))
     }
 
     @Test fun nameAndYearFromTheSlug() {
-        assertEquals("the lord of the rings" to "2001", Trakt.nameAndYear("the-lord-of-the-rings-2001"))
-        assertEquals("breaking bad" to null, Trakt.nameAndYear("breaking-bad"))
+        assertEquals("the lord of the rings" to "2001", TitleSources.nameAndYear("the-lord-of-the-rings-2001"))
+        assertEquals("breaking bad" to null, TitleSources.nameAndYear("breaking-bad"))
     }
 }
