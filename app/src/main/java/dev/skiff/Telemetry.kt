@@ -54,8 +54,12 @@ object Telemetry {
      */
     fun error(context: Context, where: String, e: Throwable) {
         if (!available(context) || !enabled(context) || Demo.on) return
-        // The cause's class too (a wrapped SocketTimeoutException, SSLHandshakeException…): what actually failed.
-        val cause = e.cause?.let { " < ${it.javaClass.simpleName}" } ?: ""
+        // The causes' classes too (a wrapped SocketTimeoutException, SSLHandshakeException…): what actually failed.
+        // A system call's error by its name (ECONNREFUSED: nothing listens there; EHOSTUNREACH: no such address).
+        val cause = generateSequence(e.cause) { it.cause }.take(3).joinToString("") { c ->
+            " < " + c.javaClass.simpleName +
+                ((c as? android.system.ErrnoException)?.let { " " + (android.system.OsConstants.errnoName(it.errno) ?: it.errno) } ?: "")
+        }
         event(context, "app_error", "where" to where, "error" to e.javaClass.simpleName + cause)
         FirebaseCrashlytics.getInstance().recordException(
             RuntimeException("$where: ${e.javaClass.name}$cause").apply { stackTrace = e.stackTrace },
