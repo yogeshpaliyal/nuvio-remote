@@ -29,7 +29,7 @@ internal object StoreUpdates {
         val fresh = System.currentTimeMillis() - p.getLong("checkedAt", 0) < EVERY
         val latest = if (!force && fresh && cached != null) cached else {
             try {
-                val json = fetch()
+                val json = fetch(context)
                 p.edit().putString("latest", json.toString()).putLong("checkedAt", System.currentTimeMillis()).apply()
                 parse(json)
             } catch (e: Exception) {
@@ -140,7 +140,7 @@ internal object StoreUpdates {
         }
     }
 
-    private fun fetch(): JSONObject {
+    private fun fetch(context: Context): JSONObject {
         val c = URL(LATEST).openConnection() as HttpURLConnection
         c.connectTimeout = 6000
         c.readTimeout = 8000

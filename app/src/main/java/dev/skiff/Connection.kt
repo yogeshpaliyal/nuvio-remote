@@ -9,7 +9,7 @@ import androidx.annotation.StringRes
  * (over pairing, Nuvio's own link: nuvio://movie/tt…).
  */
 object Connection {
-    enum class Via(@StringRes val label: Int) { AUTO(R.string.via_automatic), PAIRING(R.string.via_pairing), ADB(R.string.via_adb) }
+    enum class Via(@param:StringRes val label: Int) { AUTO(R.string.via_automatic), PAIRING(R.string.via_pairing), ADB(R.string.via_adb) }
 
     fun remote(context: Context, host: String) = get(context, "remote:", host)
     fun setRemote(context: Context, host: String, via: Via) = set(context, "remote:", host, via)
