@@ -98,6 +98,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -310,7 +311,8 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
     val titleApp = if (useAdb == false) (if (pairedStremio) "Stremio" else "Nuvio")
         else apps.firstOrNull { it.component == appComponent }?.name ?: apps.firstOrNull()?.name ?: "Nuvio"
     val ready = hostOk && useAdb != null && (idOk || (linkOk && (linkApps.isNotEmpty() || linkByPairing))) && !busy
-    val tvLabel = tvName.ifEmpty { host.trim().ifEmpty { "the TV" } }
+    val theTv = stringResource(R.string.the_tv)
+    val tvLabel = tvName.ifEmpty { host.trim().ifEmpty { theTv } }
 
     // A TV picked: which Nuvio apps it has (connecting is also when it asks to allow this phone, the first time).
     LaunchedEffect(host.trim(), appsRun, useAdb) {
@@ -322,9 +324,9 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
             val found = TvLink.apps(context, host)
             apps = found
             if (found.none { it.component == appComponent }) appComponent = found.firstOrNull()?.component
-            if (found.isEmpty()) appsError = "There's no Nuvio or Stremio app on $tvLabel. Install one, then check again."
+            if (found.isEmpty()) appsError = context.getString(R.string.no_nuvio_app_install, tvLabel)
         } catch (e: Exception) {
-            appsError = "Couldn't reach $tvLabel: ${e.message ?: e.javaClass.simpleName}"
+            appsError = context.getString(R.string.couldnt_reach, tvLabel, e.message ?: e.javaClass.simpleName)
             Telemetry.error(context, "tv_apps", e)
         } finally {
             appsLoading = false
@@ -336,7 +338,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
         val l = link ?: return
         busy = true
         failed = false
-        status = if (byPairing) "Connecting…" else "Connecting… The first time, accept “Allow USB debugging?” on the TV (tick Always allow)."
+        status = context.getString(if (byPairing) R.string.connecting else R.string.connecting_adb)
         scope.launch {
             try {
                 if (byPairing) Atv.openLink(context, host, Links.forTv(l)) else TvLink.openLink(context, host, l, linkComponent)
@@ -344,15 +346,20 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                 val p = page ?: Links.Page(linkTitle.ifBlank { Links.site(l) })
                 library.useLink(l, p, app, played = true)
                 prefs.edit().putString("host", host.trim()).putString("tvName", tvName).putString("linkApp", linkComponent).apply()
-                status = "Opened “${p.title}”" + (app?.let { " in $it" } ?: "") + " on $tvLabel."
-                ActivityLog.add(context, "Link ${Links.site(l)}" + (app?.let { " → $it" } ?: ""), if (byPairing) "Pairing" else "USB debugging")
+                status = if (app != null) context.getString(R.string.opened_link_in, p.title, app, tvLabel)
+                    else context.getString(R.string.opened_link, p.title, tvLabel)
+                ActivityLog.add(
+                    context,
+                    if (app != null) context.getString(R.string.log_link_app, Links.site(l), app) else context.getString(R.string.log_link, Links.site(l)),
+                    if (byPairing) "Pairing" else "USB debugging",
+                )
                 Telemetry.event(context, "open_link", "site" to Links.site(l), "via" to (if (byPairing) "pairing" else "adb"), "ok" to true)
             } catch (e: Exception) {
-                ActivityLog.add(context, "Link ${Links.site(l)}", if (byPairing) "Pairing" else "USB debugging", ok = false)
+                ActivityLog.add(context, context.getString(R.string.log_link, Links.site(l)), if (byPairing) "Pairing" else "USB debugging", ok = false)
                 Telemetry.event(context, "open_link", "site" to Links.site(l), "via" to (if (byPairing) "pairing" else "adb"), "ok" to false)
                 Telemetry.error(context, "open_link", e)
                 failed = true
-                status = "Couldn't open it: ${e.message ?: e.javaClass.simpleName}"
+                status = context.getString(R.string.couldnt_open, e.message ?: e.javaClass.simpleName)
             } finally {
                 busy = false
             }
@@ -365,14 +372,14 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
         failed = false
         val byPairing = titleByPairing
         val via = if (byPairing) "Pairing" else "USB debugging"
-        status = if (byPairing) "Connecting…" else "Connecting… The first time, accept “Allow USB debugging?” on the TV (tick Always allow)."
+        status = context.getString(if (byPairing) R.string.connecting else R.string.connecting_adb)
         scope.launch {
             try {
                 var n = name.trim()
                 if (n.isEmpty()) {
                     // Nuvio needs the name for its stream picker (over pairing, only for history).
                     n = Meta.lookup(imdbId)?.name.orEmpty()
-                    if (n.isEmpty() && !byPairing) error("Couldn't find this title's name. Type it in, then try again.")
+                    if (n.isEmpty() && !byPairing) error(context.getString(R.string.title_name_missing))
                     name = n
                 }
                 val title = Title(imdbId.trim(), n.ifEmpty { imdbId.trim() }, series, season, episode)
@@ -384,20 +391,21 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                 }
                 library.use(title, meta, played = true)
                 prefs.edit().putString("host", host.trim()).putString("tvName", tvName).putString("app", appComponent).apply()
+                val withEpisode = title.name + if (series) " " + context.getString(R.string.episode_short, season, episode) else ""
                 status = when {
-                    byPairing && pairedStremio -> "Opened “${title.name}” in Stremio on $tvLabel: pick a stream there."
-                    byPairing -> "Opened “${title.name}” in Nuvio on $tvLabel: pick a stream there."
-                    titleApp == "Stremio" -> "Opened “${title.name}”" + (if (series) " S$season E$episode" else "") + " in Stremio on $tvLabel: pick a stream there."
-                    else -> "Playing “${title.name}”" + (if (series) " S$season E$episode" else "") + " on $tvLabel."
+                    byPairing && pairedStremio -> context.getString(R.string.opened_title_pick_stream, title.name, "Stremio", tvLabel)
+                    byPairing -> context.getString(R.string.opened_title_pick_stream, title.name, "Nuvio", tvLabel)
+                    titleApp == "Stremio" -> context.getString(R.string.opened_title_pick_stream, withEpisode, "Stremio", tvLabel)
+                    else -> context.getString(R.string.playing_title, withEpisode, tvLabel)
                 }
-                ActivityLog.add(context, "$titleApp “${title.name}”", via)
+                ActivityLog.add(context, context.getString(R.string.log_title, titleApp, title.name), via)
                 Telemetry.event(context, "play_title", "via" to (if (byPairing) "pairing" else "adb"), "series" to series, "ok" to true)
             } catch (e: Exception) {
-                ActivityLog.add(context, "$titleApp “${name.trim().ifEmpty { imdbId }}”", via, ok = false)
+                ActivityLog.add(context, context.getString(R.string.log_title, titleApp, name.trim().ifEmpty { imdbId }), via, ok = false)
                 Telemetry.event(context, "play_title", "via" to (if (byPairing) "pairing" else "adb"), "series" to series, "ok" to false)
                 Telemetry.error(context, "play_title", e)
                 failed = true
-                status = "Couldn't open it: ${e.message ?: e.javaClass.simpleName}"
+                status = context.getString(R.string.couldnt_open, e.message ?: e.javaClass.simpleName)
             } finally {
                 busy = false
             }
@@ -436,7 +444,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
         failed = false
         status = null
         if (play) {
-            if (hostOk && !busy) openOnTv() else status = "Pick your TV, then play it."
+            if (hostOk && !busy) openOnTv() else status = context.getString(R.string.pick_tv_then_play)
         }
     }
 
@@ -513,7 +521,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
             if (found.none { it.component == linkComponent }) linkComponent = found.firstOrNull()?.component
         } catch (e: Exception) {
             failed = true
-            status = "Couldn't reach $tvLabel: ${e.message ?: e.javaClass.simpleName}"
+            status = context.getString(R.string.couldnt_reach, tvLabel, e.message ?: e.javaClass.simpleName)
             Telemetry.error(context, "link_apps", e)
         } finally {
             linkAppsLoading = false
@@ -537,7 +545,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
         if (found == null) {
             imdbId = source.searchFor(l).orEmpty()
             openWhenKnown = false
-            status = "Couldn't find that ${source.name} page's title. Pick it below."
+            status = context.getString(R.string.source_not_found, source.name)
             return@LaunchedEffect
         }
         val t = found.title
@@ -582,9 +590,9 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
         if (openWhenKnown) {
             openWhenKnown = false
             when {
-                found.series && !knownEpisode -> status = "Pick the season and episode, then play it."
+                found.series && !knownEpisode -> status = context.getString(R.string.pick_episode_then_play)
                 hostOk && !busy -> openOnTv()
-                else -> status = "Pick your TV, then play it."
+                else -> status = context.getString(R.string.pick_tv_then_play)
             }
         }
     }
@@ -619,27 +627,30 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
     var showAppSheet by remember { mutableStateOf(false) }
     // The TV and how it's reached, said once: on the chip under the title.
     val tvStatus = when {
-        hostOk -> tvLabel + when {
-            // Over pairing ("Pairing only" in Settings shows it before pairing, too).
-            useAdb == false -> if (paired) " · paired" else " · not paired yet"
-            adb == null -> " · checking…"
-            adb == TvLink.Adb.ALLOWED -> " · USB debugging"
-            else -> " · not connected yet"
-        }
-        searching -> "Looking for TVs…"
-        else -> "Pick a TV"
+        hostOk -> stringResource(
+            when {
+                // Over pairing ("Pairing only" in Settings shows it before pairing, too).
+                useAdb == false -> if (paired) R.string.tv_status_paired else R.string.tv_status_not_paired
+                adb == null -> R.string.tv_status_checking
+                adb == TvLink.Adb.ALLOWED -> R.string.tv_status_adb
+                else -> R.string.tv_status_not_connected
+            },
+            tvLabel,
+        )
+        searching -> stringResource(R.string.looking_for_tvs)
+        else -> stringResource(R.string.pick_a_tv)
     }
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Skiff", fontWeight = FontWeight.SemiBold) },
+                title = { Text(stringResource(R.string.app_name), fontWeight = FontWeight.SemiBold) },
                 actions = {
-                    IconButton(onClick = { showLibrary = true }) { Icon(AppIcons.History, "History and saved") }
+                    IconButton(onClick = { showLibrary = true }) { Icon(AppIcons.History, stringResource(R.string.history_and_saved)) }
                     // A dot on Settings when a newer Skiff is out (Settings → Update).
                     val dot by Updates.badge.collectAsState(initial = false)
                     IconButton(onClick = { showSettings = true }) {
                         BadgedBox(badge = { if (dot) Badge() }) {
-                            Icon(Icons.Rounded.Settings, if (dot) "Settings: an update is available" else "Settings")
+                            Icon(Icons.Rounded.Settings, stringResource(if (dot) R.string.settings_update_available else R.string.settings))
                         }
                     }
                 },
@@ -647,17 +658,17 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
         },
         bottomBar = {
             PlayBar(
-                label = "Play",     // the TV is named in the top bar
+                label = stringResource(R.string.play),     // the TV is named in the top bar
                 enabled = ready,
                 busy = busy,
                 hint = when {
                     busy -> null
-                    !hostOk -> "Pick a TV above"
-                    needsSetup -> "Connect to $tvLabel above"
+                    !hostOk -> stringResource(R.string.hint_pick_tv)
+                    needsSetup -> stringResource(R.string.hint_connect, tvLabel)
                     linkByPairing -> null
-                    linkOk && linkAppsLoading -> "Checking which TV app opens it…"
-                    linkOk && linkApps.isEmpty() -> "No app on $tvLabel opens ${link?.let(Links::site)} links"
-                    !idOk && !linkOk -> "Share a page (IMDb, JioHotstar, YouTube…), or paste its link"
+                    linkOk && linkAppsLoading -> stringResource(R.string.hint_checking_link_app)
+                    linkOk && linkApps.isEmpty() -> stringResource(R.string.no_app_for_link, tvLabel, link?.let(Links::site).orEmpty())
+                    !idOk && !linkOk -> stringResource(R.string.hint_share)
                     else -> null
                 },
                 onClick = { openOnTv() },
@@ -682,7 +693,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                     onClick = { showTvSheet = true },
                     label = { Text(tvStatus, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     leadingIcon = { Icon(AppIcons.Tv, null, Modifier.size(18.dp)) },
-                    trailingIcon = { Icon(Icons.Rounded.ArrowDropDown, "Change TV", Modifier.size(20.dp)) },
+                    trailingIcon = { Icon(Icons.Rounded.ArrowDropDown, stringResource(R.string.change_tv), Modifier.size(20.dp)) },
                     shape = MaterialTheme.shapes.extraLarge,
                 )
             }
@@ -692,23 +703,22 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                 PairCard(
                     host,
                     onPaired = { pairedRun++ },
-                    title = "Connect to $tvLabel",
+                    title = stringResource(R.string.connect_to, tvLabel),
                     intro = if (adb == TvLink.Adb.NOT_ALLOWED) {
-                        "$tvLabel is asking “Allow USB debugging?”: allow it (tick Always allow), then Check again. " +
-                            "Or pair instead: the TV shows a code, you type it here."
+                        stringResource(R.string.connect_intro_not_allowed, tvLabel)
                     } else {
-                        "One time only: the TV shows a code, you type it here. Nothing to change in the TV's settings."
+                        stringResource(R.string.connect_intro)
                     },
                     footer = {
                         Text(
-                            "Already use USB debugging (Developer options)? Turn it on, then check again.",
+                            stringResource(R.string.connect_footer),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         TextButton(onClick = { adbRun++ }) {
                             Icon(Icons.Rounded.Refresh, null, Modifier.size(18.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text("Check again")
+                            Text(stringResource(R.string.check_again))
                         }
                     },
                 )
@@ -739,7 +749,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                         else -> { link = null; imdbId = v; keepType = false }     // as typed: trimming ate the space between words
                     }
                 },
-                placeholder = { Text("Search a title, or paste a link") },
+                placeholder = { Text(stringResource(R.string.search_placeholder)) },
                 leadingIcon = { Icon(Icons.Rounded.Search, null) },
                 isError = imdbId.lowercase().startsWith("tt") && imdbId.drop(2).all { it.isDigit() } && imdbId.length > 2 && !idOk,
                 singleLine = true,
@@ -768,7 +778,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                     failed = false
                     hits = emptyList()
                     Telemetry.event(context, "clear_input")
-                        }) { Icon(Icons.Rounded.Close, "Clear") }
+                        }) { Icon(Icons.Rounded.Close, stringResource(R.string.clear)) }
                     } else {
                         TextButton(onClick = {
                             clipboard.getText()?.text?.let { t ->
@@ -782,7 +792,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                                 }
                                 Telemetry.event(context, "paste", "kind" to when { source != null -> source.key; id != null -> "title"; l != null -> "link"; else -> "none" })
                             }
-                        }) { Text("Paste") }
+                        }) { Text(stringResource(R.string.paste)) }
                     }
                 },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
@@ -807,10 +817,10 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                     findingTitles -> Row(verticalAlignment = Alignment.CenterVertically) {
                         LoadingIndicator(Modifier.size(32.dp))
                         Spacer(Modifier.width(12.dp))
-                        Text("Searching…", style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(R.string.searching), style = MaterialTheme.typography.bodyMedium)
                     }
                     else -> Text(
-                        "No title called “$query”. Try fewer words, or paste its IMDb link.",
+                        stringResource(R.string.no_title_called, query),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -820,8 +830,8 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
             // Nothing entered: the last few used, one tap from the TV.
             val recent = entries.filter { it.inHistory }.take(3)
             if (!idOk && !linkOk && query.length < 2 && recent.isNotEmpty()) {
-                SectionHeader("Recent") {
-                    TextButton(onClick = { showLibrary = true }) { Text("See all") }
+                SectionHeader(stringResource(R.string.recent)) {
+                    TextButton(onClick = { showLibrary = true }) { Text(stringResource(R.string.see_all)) }
                 }
                 for (e in recent) {
                     EntryRow(
@@ -850,7 +860,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                 ) {
                     Icon(if (savedNow) AppIcons.Bookmark else AppIcons.BookmarkBorder, null, Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text(if (savedNow) "Saved for later" else "Save for later")
+                    Text(stringResource(if (savedNow) R.string.saved_for_later else R.string.save_for_later))
                 }
             }
 
@@ -860,7 +870,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                         LoadingIndicator()
                     }
                     m != null -> TitleCard(m)
-                    valid && notFound -> NoteCard(Icons.Rounded.Warning, "Not on Cinemeta. Type the title below.", error = true)
+                    valid && notFound -> NoteCard(Icons.Rounded.Warning, stringResource(R.string.not_on_cinemeta), error = true)
                     else -> Spacer(Modifier.height(0.dp))
                 }
             }
@@ -877,7 +887,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                 ) {
                     Icon(if (savedNow) AppIcons.Bookmark else AppIcons.BookmarkBorder, null, Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text(if (savedNow) "Saved for later" else "Save for later")
+                    Text(stringResource(if (savedNow) R.string.saved_for_later else R.string.save_for_later))
                 }
             }
 
@@ -892,7 +902,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                     ) {
                         Icon(AppIcons.Movie, null, Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("Movie")
+                        Text(stringResource(R.string.movie))
                     }
                     ToggleButton(
                         checked = series,
@@ -902,15 +912,15 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                     ) {
                         Icon(AppIcons.Series, null, Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("Series")
+                        Text(stringResource(R.string.series))
                     }
                 }
             }
 
             AnimatedVisibility(visible = idOk && series, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Stepper("Season", season, { season = it }, Modifier.weight(1f))
-                    Stepper("Episode", episode, { episode = it }, Modifier.weight(1f))
+                    Stepper(stringResource(R.string.season), season, { season = it }, Modifier.weight(1f))
+                    Stepper(stringResource(R.string.episode), episode, { episode = it }, Modifier.weight(1f))
                 }
             }
 
@@ -919,7 +929,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                     OutlinedTextField(
                         value = name,
                         onValueChange = { name = it; autoName = false },
-                        label = { Text("Name shown in Nuvio") },
+                        label = { Text(stringResource(R.string.name_shown_in_nuvio)) },
                         singleLine = true,
                         shape = MaterialTheme.shapes.large,
                         modifier = Modifier.fillMaxWidth(),
@@ -929,7 +939,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                     TextButton(onClick = { editName = true }) {
                         Icon(Icons.Rounded.Edit, null, Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Edit the name")
+                        Text(stringResource(R.string.edit_the_name))
                     }
                 }
             }
@@ -941,13 +951,13 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                     else apps.firstOrNull { it.component == appComponent }?.let { listOfNotNull(it.name, it.version).joinToString(" ") }
                 val loading = if (linkOk) linkAppsLoading else appsLoading
                 val line = when {
-                    useAdb == false -> if (linkOk) "Opens in the TV's app for ${link?.let(Links::site)}"
-                        else if (pairedStremio) "Opens in Stremio, at the streams" else "Opens in Nuvio, on the title's page"
+                    useAdb == false -> if (linkOk) stringResource(R.string.opens_in_tv_app_for, link?.let(Links::site).orEmpty())
+                        else stringResource(if (pairedStremio) R.string.opens_in_stremio_streams else R.string.opens_in_nuvio_page)
                     useAdb == null -> null
-                    loading -> "Checking which app opens it…"
-                    chosen != null -> "Opens in $chosen"
-                    linkOk -> "No app on $tvLabel opens ${link?.let(Links::site)} links"
-                    else -> appsError ?: "No Nuvio or Stremio app on $tvLabel"
+                    loading -> stringResource(R.string.checking_which_app)
+                    chosen != null -> stringResource(R.string.opens_in, chosen)
+                    linkOk -> stringResource(R.string.no_app_for_link, tvLabel, link?.let(Links::site).orEmpty())
+                    else -> appsError ?: stringResource(R.string.no_nuvio_app, tvLabel)
                 }
                 val pairedChoice = useAdb == false && !linkOk      // Nuvio or Stremio, over pairing
                 val choosable = pairedChoice || useAdb == true && !loading && (if (linkOk) linkApps.size else apps.size) > 1
@@ -964,7 +974,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                             if (loading) LoadingIndicator(Modifier.size(22.dp)) else Icon(AppIcons.Tv, null, Modifier.size(20.dp))
                             Spacer(Modifier.width(12.dp))
                             Text(line, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                            if (choosable || problem) Icon(Icons.Rounded.ArrowDropDown, "Choose the app")
+                            if (choosable || problem) Icon(Icons.Rounded.ArrowDropDown, stringResource(R.string.choose_the_app))
                         }
                     }
                 }
@@ -975,7 +985,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
             }
 
             Text(
-                "The phone and the TV on the same Wi-Fi.",
+                stringResource(R.string.same_wifi),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(vertical = 8.dp),
@@ -990,12 +1000,12 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                 Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                SectionHeader("Your TV") {
+                SectionHeader(stringResource(R.string.your_tv)) {
                     if (!searching) {
                         TextButton(onClick = { finder.start(); searchRun++ }) {
                             Icon(Icons.Rounded.Refresh, null, Modifier.size(18.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text("Search again")
+                            Text(stringResource(R.string.search_again))
                         }
                     }
                 }
@@ -1010,7 +1020,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                             else Icon(AppIcons.Tv, null, Modifier.size(32.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(Modifier.width(16.dp))
                             Text(
-                                if (searching) "Looking for TVs on your Wi-Fi…" else "No TV found on this Wi-Fi. Enter its address.",
+                                stringResource(if (searching) R.string.looking_for_tvs_wifi else R.string.no_tv_found),
                                 style = MaterialTheme.typography.bodyLarge,
                             )
                         }
@@ -1035,9 +1045,9 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                     OutlinedTextField(
                         value = host,
                         onValueChange = { host = it; tvName = "" },
-                        label = { Text("TV address") },
+                        label = { Text(stringResource(R.string.tv_address)) },
                         placeholder = { Text("192.168.1.7") },
-                        supportingText = { Text("On the TV: Settings → Network & Internet") },
+                        supportingText = { Text(stringResource(R.string.tv_address_help)) },
                         singleLine = true,
                         shape = MaterialTheme.shapes.large,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
@@ -1045,7 +1055,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                     )
                 }
                 if (!manual && tvs.any { it.ready }) {
-                    TextButton(onClick = { manual = true; Telemetry.event(context, "manual_address") }) { Text("Enter an address instead") }
+                    TextButton(onClick = { manual = true; Telemetry.event(context, "manual_address") }) { Text(stringResource(R.string.enter_address_instead)) }
                 }
 
             }
@@ -1059,21 +1069,21 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                 Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                SectionHeader("Open with") {
+                SectionHeader(stringResource(R.string.open_with)) {
                     if (useAdb == true) TextButton(onClick = { adbRun++; if (linkOk) linkRun++ else appsRun++ }) {
                         Icon(Icons.Rounded.Refresh, null, Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Check again")
+                        Text(stringResource(R.string.check_again))
                     }
                 }
                 if (useAdb == false && !linkOk) {
                     // Paired: the TV doesn't say which apps it has, so these are what Skiff knows how to open.
                     AppCard(
-                        "Nuvio", "Opens the title's page",
+                        "Nuvio", stringResource(R.string.app_nuvio_subtitle),
                         selected = !pairedStremio, onClick = { pairedStremio = false; showAppSheet = false },
                     )
                     AppCard(
-                        "Stremio", "Opens the streams for it (the episode, for a series)",
+                        "Stremio", stringResource(R.string.app_stremio_subtitle),
                         selected = pairedStremio, onClick = { pairedStremio = true; showAppSheet = false },
                     )
                 } else if (linkOk) {
@@ -1086,12 +1096,12 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                             Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
                                 LoadingIndicator(Modifier.size(40.dp))
                                 Spacer(Modifier.width(16.dp))
-                                Text("Checking which app on $tvLabel opens it…", style = MaterialTheme.typography.bodyLarge)
+                                Text(stringResource(R.string.checking_link_app_on, tvLabel), style = MaterialTheme.typography.bodyLarge)
                             }
                         }
                         linkApps.isEmpty() -> NoteCard(
                             Icons.Rounded.Warning,
-                            "No app on $tvLabel opens ${link?.let(Links::site)} links. Install its TV app, then try again.",
+                            stringResource(R.string.no_app_for_link_install, tvLabel, link?.let(Links::site).orEmpty()),
                             error = true,
                         )
                         else -> for (app in linkApps) {
@@ -1112,7 +1122,7 @@ private fun RemoteScreen(shared: Title.Shared?, onSharedUsed: () -> Unit, openSc
                                 LoadingIndicator(Modifier.size(40.dp))
                                 Spacer(Modifier.width(16.dp))
                                 Text(
-                                    "Checking $tvLabel's apps… The first time, allow USB debugging on the TV.",
+                                    stringResource(R.string.checking_apps_on, tvLabel),
                                     style = MaterialTheme.typography.bodyLarge,
                                 )
                             }
@@ -1168,7 +1178,7 @@ private fun SearchHitRow(h: Meta.Hit, onPick: () -> Unit) {
             Column(Modifier.weight(1f)) {
                 Text(h.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Text(
-                    listOfNotNull(if (h.series) "Series" else "Movie", h.year).joinToString(" · "),
+                    listOfNotNull(stringResource(if (h.series) R.string.series else R.string.movie), h.year).joinToString(" · "),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1209,14 +1219,14 @@ private fun TvCard(tv: TvFinder.Tv, selected: Boolean, paired: Boolean, onClick:
                 Text(
                     when {
                         tv.ready -> tv.host
-                        paired -> "${tv.host} · paired"
-                        else -> "${tv.host} · pair it from the remote"
+                        paired -> stringResource(R.string.tv_host_paired, tv.host)
+                        else -> stringResource(R.string.tv_host_pair_from_remote, tv.host)
                     },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            if (selected) Icon(Icons.Rounded.Check, "Selected", tint = MaterialTheme.colorScheme.primary)
+            if (selected) Icon(Icons.Rounded.Check, stringResource(R.string.selected), tint = MaterialTheme.colorScheme.primary)
         }
     }
 }
@@ -1257,7 +1267,7 @@ private fun AppCard(title: String, subtitle: String, selected: Boolean, onClick:
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            if (selected) Icon(Icons.Rounded.Check, "Selected", tint = MaterialTheme.colorScheme.tertiary)
+            if (selected) Icon(Icons.Rounded.Check, stringResource(R.string.selected), tint = MaterialTheme.colorScheme.tertiary)
         }
     }
 }
@@ -1330,7 +1340,7 @@ private fun TitleCard(m: Meta.Found) {
                         Text(details.joinToString(" · "), style = MaterialTheme.typography.bodyMedium, color = onArt.copy(alpha = 0.85f))
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Pill(if (m.series) "Series" else "Movie")
+                        Pill(stringResource(if (m.series) R.string.series else R.string.movie))
                         m.rating?.let { Pill("★ $it") }
                     }
                 }
@@ -1412,7 +1422,7 @@ private fun PlayBar(
             // The remote beside Play: the two things done with the TV.
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 FilledTonalIconButton(onClick = onRemote, enabled = remoteEnabled, modifier = Modifier.size(height)) {
-                    Icon(AppIcons.Remote, "Remote", Modifier.size(ButtonDefaults.iconSizeFor(height)))
+                    Icon(AppIcons.Remote, stringResource(R.string.remote), Modifier.size(ButtonDefaults.iconSizeFor(height)))
                 }
                 Button(
                     onClick = onClick,

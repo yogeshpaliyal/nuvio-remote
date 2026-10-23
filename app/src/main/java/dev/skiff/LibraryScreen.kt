@@ -67,6 +67,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -99,8 +101,8 @@ fun LibraryScreen(
         scope.launch {
             snackbar.currentSnackbarData?.dismiss()
             val r = snackbar.showSnackbar(
-                "Removed “${e.name}”" + if (tab == 0) " from history" else " from saved",
-                actionLabel = "Undo", withDismissAction = true,
+                context.getString(if (tab == 0) R.string.removed_from_history else R.string.removed_from_saved, e.name),
+                actionLabel = context.getString(R.string.undo), withDismissAction = true,
             )
             if (r == SnackbarResult.ActionPerformed) {
                 library.restore(e)
@@ -115,17 +117,17 @@ fun LibraryScreen(
         topBar = {
             Column {
                 LargeFlexibleTopAppBar(
-                    title = { Text("Library") },
-                    subtitle = { Text("${history.size} in history · ${saved.size} saved") },
+                    title = { Text(stringResource(R.string.library)) },
+                    subtitle = { Text(stringResource(R.string.library_counts, history.size, saved.size)) },
                     navigationIcon = {
-                        IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back") }
+                        IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.back)) }
                     },
                     scrollBehavior = scroll,
                 )
                 PrimaryTabRow(selectedTabIndex = tab) {
-                    Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("History") },
+                    Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text(stringResource(R.string.history)) },
                         icon = { Icon(AppIcons.History, null) })
-                    Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("Saved for later") },
+                    Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text(stringResource(R.string.saved_for_later)) },
                         icon = { Icon(AppIcons.Bookmark, null) })
                 }
             }
@@ -140,8 +142,7 @@ fun LibraryScreen(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
-                        if (tab == 0) "Titles and links you share, paste or play show up here."
-                        else "Tap the bookmark on a title to watch it later.",
+                        stringResource(if (tab == 0) R.string.history_empty else R.string.saved_empty),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -167,7 +168,7 @@ fun LibraryScreen(
                                 },
                                 onEdit = { editing = e },
                                 onRemove = { remove(e) },
-                                removeLabel = if (tab == 0) "Remove from history" else "Remove from saved",
+                                removeLabel = stringResource(if (tab == 0) R.string.remove_from_history else R.string.remove_from_saved),
                             )
                         }
                     }
@@ -195,7 +196,7 @@ private fun SwipeToRemove(onRemove: () -> Unit, content: @Composable () -> Unit)
                     .padding(horizontal = 24.dp),
                 contentAlignment = Alignment.CenterEnd,
             ) {
-                Icon(Icons.Rounded.Delete, "Remove", tint = MaterialTheme.colorScheme.onErrorContainer)
+                Icon(Icons.Rounded.Delete, stringResource(R.string.remove), tint = MaterialTheme.colorScheme.onErrorContainer)
             }
         },
     ) { content() }
@@ -210,7 +211,7 @@ fun EntryRow(
     onToggleSaved: () -> Unit,
     onEdit: (() -> Unit)? = null,
     onRemove: (() -> Unit)? = null,
-    removeLabel: String = "Remove",
+    removeLabel: String = stringResource(R.string.remove),
 ) {
     var menu by remember { mutableStateOf(false) }
     Card(
@@ -239,8 +240,8 @@ fun EntryRow(
                     listOfNotNull(
                         when {
                             e.link != null -> e.app ?: Links.site(e.link)
-                            e.series -> "S${e.season} E${e.episode}"
-                            else -> "Movie"
+                            e.series -> stringResource(R.string.episode_short, e.season, e.episode)
+                            else -> stringResource(R.string.movie)
                         },
                         e.year,
                         DateUtils.getRelativeTimeSpanString(e.lastUsed, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS).toString(),
@@ -251,7 +252,7 @@ fun EntryRow(
                 )
                 if (e.plays > 0) {
                     Text(
-                        if (e.plays == 1) "Played once" else "Played ${e.plays} times",
+                        pluralStringResource(R.plurals.played_times, e.plays, e.plays),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary,
                     )
@@ -260,17 +261,17 @@ fun EntryRow(
             IconButton(onClick = onToggleSaved) {
                 Icon(
                     if (e.saved) AppIcons.Bookmark else AppIcons.BookmarkBorder,
-                    if (e.saved) "Remove from saved" else "Save for later",
+                    stringResource(if (e.saved) R.string.remove_from_saved else R.string.save_for_later),
                     tint = if (e.saved) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            FilledTonalIconButton(onClick = onPlay) { Icon(Icons.Rounded.PlayArrow, "Play on TV") }
+            FilledTonalIconButton(onClick = onPlay) { Icon(Icons.Rounded.PlayArrow, stringResource(R.string.play_on_tv)) }
             if (onEdit != null || onRemove != null) {
                 Box {
-                    IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, "More") }
+                    IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, stringResource(R.string.more)) }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                         onEdit?.let {
-                            DropdownMenuItem(text = { Text("Edit") }, leadingIcon = { Icon(Icons.Rounded.Edit, null) },
+                            DropdownMenuItem(text = { Text(stringResource(R.string.edit)) }, leadingIcon = { Icon(Icons.Rounded.Edit, null) },
                                 onClick = { menu = false; it() })
                         }
                         onRemove?.let {
@@ -297,32 +298,32 @@ private fun EditDialog(e: Library.Entry, onDismiss: () -> Unit, onSave: (Library
     val ok = name.isNotBlank() && (!series || (s != null && s > 0 && ep != null && ep > 0))
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Edit") },
+        title = { Text(stringResource(R.string.edit)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
-                    value = name, onValueChange = { name = it }, label = { Text("Name shown in Nuvio") },
+                    value = name, onValueChange = { name = it }, label = { Text(stringResource(R.string.name_shown_in_nuvio)) },
                     singleLine = true, shape = MaterialTheme.shapes.large, modifier = Modifier.fillMaxWidth(),
                 )
                 if (e.link == null) Row(horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween)) {
                     ToggleButton(
                         checked = !series, onCheckedChange = { series = false },
                         shapes = ButtonGroupDefaults.connectedLeadingButtonShapes(), modifier = Modifier.weight(1f),
-                    ) { Text("Movie") }
+                    ) { Text(stringResource(R.string.movie)) }
                     ToggleButton(
                         checked = series, onCheckedChange = { series = true },
                         shapes = ButtonGroupDefaults.connectedTrailingButtonShapes(), modifier = Modifier.weight(1f),
-                    ) { Text("Series") }
+                    ) { Text(stringResource(R.string.series)) }
                 }
                 if (series && e.link == null) {
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         OutlinedTextField(
-                            value = season, onValueChange = { season = it.filter(Char::isDigit) }, label = { Text("Season") },
+                            value = season, onValueChange = { season = it.filter(Char::isDigit) }, label = { Text(stringResource(R.string.season)) },
                             singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             shape = MaterialTheme.shapes.large, modifier = Modifier.weight(1f),
                         )
                         OutlinedTextField(
-                            value = episode, onValueChange = { episode = it.filter(Char::isDigit) }, label = { Text("Episode") },
+                            value = episode, onValueChange = { episode = it.filter(Char::isDigit) }, label = { Text(stringResource(R.string.episode)) },
                             singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             shape = MaterialTheme.shapes.large, modifier = Modifier.weight(1f),
                         )
@@ -333,8 +334,8 @@ private fun EditDialog(e: Library.Entry, onDismiss: () -> Unit, onSave: (Library
         confirmButton = {
             TextButton(enabled = ok, onClick = {
                 onSave(e.copy(name = name.trim(), series = series, season = if (series) s ?: 1 else 1, episode = if (series) ep ?: 1 else 1))
-            }) { Text("Save") }
+            }) { Text(stringResource(R.string.save)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
     )
 }

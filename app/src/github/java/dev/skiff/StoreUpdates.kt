@@ -55,7 +55,7 @@ internal object StoreUpdates {
                 )
             }
             progress.value = Updates.Progress.Problem(
-                "Allow Skiff to install apps. Android restarts Skiff when you do; the update opens again, tap Update.",
+                context.getString(R.string.update_allow_install),
             )
             return
         }
@@ -64,11 +64,11 @@ internal object StoreUpdates {
             val apk = download(context, apkUrl) { progress.value = Updates.Progress.Downloading(it) }
             // It must be Skiff (the release app), or nothing is installed.
             val pkg = context.packageManager.getPackageArchiveInfo(apk.path, 0)?.packageName
-            if (pkg != RELEASE_PACKAGE) error("The download isn't Skiff ($pkg)")
+            if (pkg != RELEASE_PACKAGE) error(context.getString(R.string.download_not_skiff, pkg.toString()))
             progress.value = Updates.Progress.Installing
             install(context, apk)
         } catch (e: Exception) {
-            progress.value = Updates.Progress.Problem("Couldn't update: ${e.message ?: e.javaClass.simpleName}")
+            progress.value = Updates.Progress.Problem(context.getString(R.string.couldnt_update, e.message ?: e.javaClass.simpleName))
             Telemetry.error(context, "update_install", e)
         }
     }
@@ -90,7 +90,7 @@ internal object StoreUpdates {
         c.readTimeout = 30_000
         c.instanceFollowRedirects = true
         try {
-            if (c.responseCode != 200) error("GitHub answered ${c.responseCode}")
+            if (c.responseCode != 200) error(context.getString(R.string.github_answered, c.responseCode))
             val total = c.contentLengthLong
             var done = 0L
             var shown = -1
@@ -110,7 +110,7 @@ internal object StoreUpdates {
                     }
                 }
             }
-            if (total > 0 && done != total) error("The download stopped early")
+            if (total > 0 && done != total) error(context.getString(R.string.download_stopped))
             file
         } finally {
             c.disconnect()
@@ -146,7 +146,7 @@ internal object StoreUpdates {
         c.readTimeout = 8000
         c.setRequestProperty("Accept", "application/vnd.github+json")
         try {
-            if (c.responseCode != 200) error("GitHub answered ${c.responseCode}")
+            if (c.responseCode != 200) error(context.getString(R.string.github_answered, c.responseCode))
             return JSONObject(c.inputStream.bufferedReader().readText())
         } finally {
             c.disconnect()

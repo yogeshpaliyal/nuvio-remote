@@ -1,6 +1,7 @@
 package dev.skiff
 
 import android.content.Context
+import androidx.annotation.StringRes
 
 /**
  * How each TV is reached, for the remote and for links (Settings): Automatic (the TV's ADB when this phone is allowed,
@@ -8,7 +9,7 @@ import android.content.Context
  * (over pairing, Nuvio's own link: nuvio://movie/tt…).
  */
 object Connection {
-    enum class Via(val label: String) { AUTO("Automatic"), PAIRING("Pairing"), ADB("USB debugging") }
+    enum class Via(@StringRes val label: Int) { AUTO(R.string.via_automatic), PAIRING(R.string.via_pairing), ADB(R.string.via_adb) }
 
     fun remote(context: Context, host: String) = get(context, "remote:", host)
     fun setRemote(context: Context, host: String, via: Via) = set(context, "remote:", host, via)

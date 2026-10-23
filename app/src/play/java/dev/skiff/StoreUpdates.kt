@@ -28,7 +28,7 @@ internal object StoreUpdates {
         val i = try {
             manager.requestAppUpdateInfo()
         } catch (e: Exception) {
-            if (force) throw IllegalStateException("Google Play didn't answer: is Skiff installed from Play?", e)
+            if (force) throw IllegalStateException(context.getString(R.string.play_no_answer), e)
             Telemetry.error(context, "update_check", e)
             return null
         }

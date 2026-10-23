@@ -1,7 +1,9 @@
 package dev.skiff
 
 import android.content.Context
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.ui.res.stringResource
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -55,4 +57,12 @@ object ActivityLog {
     }
 
     private fun prefs(context: Context) = context.getSharedPreferences("activity", Context.MODE_PRIVATE)
+}
+
+/** An entry's `via` in the app's language (it's kept as "Pairing" or "USB debugging"). */
+@Composable
+fun viaLabel(via: String): String = when (via) {
+    "Pairing" -> stringResource(R.string.via_pairing)
+    "USB debugging" -> stringResource(R.string.via_adb)
+    else -> via
 }

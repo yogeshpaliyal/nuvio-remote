@@ -80,6 +80,10 @@ android {
         compose = true
         buildConfig = true
     }
+    // The languages in res/values-*: Android 13+ lists them under Skiff's own language (Settings → Apps → Skiff).
+    androidResources {
+        generateLocaleConfig = true
+    }
 }
 
 kotlin {

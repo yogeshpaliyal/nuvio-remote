@@ -26,6 +26,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -44,8 +45,8 @@ fun PairCard(
     onPaired: () -> Unit,
     modifier: Modifier = Modifier,
     onCancel: (() -> Unit)? = null,
-    title: String = "Pair with this TV",
-    intro: String = "Like the Google TV app: the TV shows a code, you type it here. No developer options or USB debugging.",
+    title: String = stringResource(R.string.pair_title),
+    intro: String = stringResource(R.string.pair_intro),
     footer: @Composable () -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -65,7 +66,7 @@ fun PairCard(
                 pairing = Atv.pair(context, host)
                 code = ""
             } catch (e: Exception) {
-                note = "Couldn't start pairing: ${e.message ?: e.javaClass.simpleName}"
+                note = context.getString(R.string.couldnt_start_pairing, e.message ?: e.javaClass.simpleName)
                 Telemetry.error(context, "pair_start", e)
             } finally {
                 busy = false
@@ -82,18 +83,18 @@ fun PairCard(
                     Atv.Pairing.Result.PAIRED -> {
                         pairing = null
                         note = null
-                        ActivityLog.add(context, "Paired with ${host.trim()}", "Pairing")
+                        ActivityLog.add(context, context.getString(R.string.log_paired_with, host.trim()), "Pairing")
                         Telemetry.event(context, "pair")
                         onPaired()
                     }
                     Atv.Pairing.Result.MISTYPED -> {
-                        note = "That code doesn't match: check it on the TV."
+                        note = context.getString(R.string.code_mismatch)
                         Telemetry.event(context, "pair_failed", "reason" to "mistyped")
                     }
                     Atv.Pairing.Result.REFUSED -> {
                         pairing = null
                         Telemetry.event(context, "pair_failed", "reason" to "refused")
-                        note = "The TV didn't accept it. Pair again."
+                        note = context.getString(R.string.pair_refused)
                     }
                 }
             } finally {
@@ -106,14 +107,14 @@ fun PairCard(
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Text(
-                if (pairing == null) intro else "Type the code shown on the TV.",
+                if (pairing == null) intro else stringResource(R.string.type_code),
                 style = MaterialTheme.typography.bodyMedium,
             )
             if (pairing != null) {
                 OutlinedTextField(
                     value = code,
                     onValueChange = { v -> code = v.uppercase().filter { it in "0123456789ABCDEF" }.take(6) },
-                    label = { Text("Code on the TV") },
+                    label = { Text(stringResource(R.string.code_on_tv)) },
                     singleLine = true,
                     shape = MaterialTheme.shapes.large,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters, imeAction = ImeAction.Done),
@@ -124,11 +125,11 @@ fun PairCard(
             note?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error) }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (pairing == null) {
-                    Button(onClick = { start() }, enabled = !busy && host.isNotBlank()) { Text("Show a code on the TV") }
-                    onCancel?.let { TextButton(onClick = it) { Text("Cancel") } }
+                    Button(onClick = { start() }, enabled = !busy && host.isNotBlank()) { Text(stringResource(R.string.show_code)) }
+                    onCancel?.let { TextButton(onClick = it) { Text(stringResource(R.string.cancel)) } }
                 } else {
-                    Button(onClick = { finish() }, enabled = !busy && code.length == 6) { Text("Pair") }
-                    TextButton(onClick = { pairing?.close(); pairing = null; onCancel?.invoke() }) { Text("Cancel") }
+                    Button(onClick = { finish() }, enabled = !busy && code.length == 6) { Text(stringResource(R.string.pair)) }
+                    TextButton(onClick = { pairing?.close(); pairing = null; onCancel?.invoke() }) { Text(stringResource(R.string.cancel)) }
                 }
                 if (busy) LoadingIndicator(Modifier.size(28.dp))
             }
