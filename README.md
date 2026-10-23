@@ -28,6 +28,11 @@ playback, power, and **Type on the TV** (text straight into the TV's search box,
 Arrows, volume and seek repeat when held, and the phone's own volume buttons turn the TV's volume while it's open. A
 **Quick Settings tile** (Skiff remote) opens it from anywhere.
 
+**Cursor** (over USB debugging) swaps the D-pad for a touchpad and puts a mouse pointer on the TV, for apps that
+don't follow the D-pad: drag to move it, tap to click, the strip at the edge scrolls. With **Air** on, turning the
+phone, held like a remote, moves it (the gyroscope). The pointer is a USB mouse made up on the TV with Android's own
+`hid` command (Android 9 and later); pairing's protocol has no pointer.
+
 ## History and Saved for later
 
 Every title and link you share, paste or play goes to **History** (newest first, with its episode and when), and the bookmark
@@ -40,6 +45,7 @@ removes it, and so does a swipe, with Undo. Kept on the phone (`files/library.js
 |---|---|---|
 | Setup on the TV | None: type the code it shows, once | Developer options → USB debugging, then allow the phone |
 | Remote and typing | Yes | Yes |
+| Cursor (air mouse) | No | Yes |
 | Shared links | Yes; the TV picks the app | Yes; you pick the app under **Open with** |
 | IMDb titles in Nuvio | Opens the title's page | Straight to the stream picker, with the episode |
 | IMDb titles in Stremio | The streams, with the episode | The streams, with the episode |

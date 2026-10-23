@@ -25,7 +25,18 @@ interface TvKeys : AutoCloseable {
      */
     val isOpen: Boolean get() = true
 
+    /** A mouse pointer on the TV ([mouse]): over ADB only, the remote protocol has none. */
+    val hasCursor: Boolean get() = false
+
+    /**
+     * Moves the TV's mouse pointer by (dx, dy), in a mouse's counts, with `buttons` held ([BUTTON_LEFT]…: a click is
+     * a report with it, then one without) and the wheel turned by `wheel` (up is positive).
+     */
+    suspend fun mouse(dx: Int, dy: Int, buttons: Int = 0, wheel: Int = 0) {}
+
     companion object {
+        const val BUTTON_LEFT = 1
+        const val BUTTON_RIGHT = 2
         private val NO_FIELD: StateFlow<String?> = MutableStateFlow(null)
     }
 }

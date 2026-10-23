@@ -50,6 +50,7 @@ object Demo {
     val keys = object : TvKeys {
         override suspend fun key(code: Int) {}
         override suspend fun text(s: String) {}
+        override val hasCursor = true
         override fun close() {}
     }
 
