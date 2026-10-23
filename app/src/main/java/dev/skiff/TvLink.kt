@@ -131,10 +131,62 @@ object TvLink {
             order.withLock { withContext(Dispatchers.IO) { tv.shell(command) } }
         }
 
+        override val hasCursor = true
+
+        /**
+         * The pointer: a USB mouse made up on the TV with Android's `hid` command (Android 9 and later: what its own
+         * tests plug in), opened at the first move and kept while the remote is. Its reports go to the command's input
+         * as they come; the TV draws the pointer, as for a real mouse, and the mouse goes away with the connection.
+         */
+        private var hid: dadb.AdbShellStream? = null
+        private val pointer = Mutex()
+
+        override suspend fun mouse(dx: Int, dy: Int, buttons: Int, wheel: Int) = pointer.withLock {
+            withContext(Dispatchers.IO) {
+                val m = hid ?: tv.openShell("hid -").also {
+                    it.write("""{"id":1,"command":"register","name":"Skiff cursor","vid":0x1209,"pid":0x0001,"bus":"usb","descriptor":[$MOUSE]}""" + "\n")
+                    hid = it
+                }
+                try {
+                    // A report moves at most 127 either way: a bigger move goes as several.
+                    var x = dx
+                    var y = dy
+                    var w = wheel
+                    do {
+                        val sx = x.coerceIn(-127, 127)
+                        val sy = y.coerceIn(-127, 127)
+                        val sw = w.coerceIn(-127, 127)
+                        m.write("""{"id":1,"command":"report","report":[$buttons,${sx and 0xff},${sy and 0xff},${sw and 0xff}]}""" + "\n")
+                        x -= sx
+                        y -= sy
+                        w -= sw
+                    } while (x != 0 || y != 0 || w != 0)
+                } catch (e: Exception) {
+                    // The TV ended the command: a new mouse at the next move.
+                    runCatching { m.close() }
+                    hid = null
+                    throw e
+                }
+            }
+        }
+
         override fun close() {
+            runCatching { hid?.close() }
             runCatching { tv.close() }
         }
     }
+
+    /**
+     * A mouse's HID report descriptor: three buttons, then X, Y and the wheel, each a relative byte. Its reports are
+     * those four bytes.
+     */
+    private val MOUSE = listOf(
+        0x05, 0x01, 0x09, 0x02, 0xA1, 0x01, 0x09, 0x01, 0xA1, 0x00,
+        0x05, 0x09, 0x19, 0x01, 0x29, 0x03, 0x15, 0x00, 0x25, 0x01, 0x95, 0x03, 0x75, 0x01, 0x81, 0x02,
+        0x95, 0x01, 0x75, 0x05, 0x81, 0x03,
+        0x05, 0x01, 0x09, 0x30, 0x09, 0x31, 0x09, 0x38, 0x15, 0x81, 0x25, 0x7F, 0x75, 0x08, 0x95, 0x03, 0x81, 0x06,
+        0xC0, 0xC0,
+    ).joinToString(",") { "0x%02x".format(it) }
 
     /** Off the main thread. A connected remote (it asks the TV to allow this phone, the first time). */
     suspend fun remote(context: Context, host: String): Remote = lock.withLock {

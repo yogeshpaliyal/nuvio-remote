@@ -46,6 +46,7 @@ import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -109,6 +110,13 @@ fun RemoteScreen(host: String, tvName: String, onBack: () -> Unit) {
     var typing by remember { mutableStateOf(false) }
     var typed by remember { mutableStateOf("") }
     val ready = remote != null
+    // The cursor: a touchpad in the D-pad's place, and (air) the phone's turns moving the pointer. Over ADB only.
+    var cursor by remember { mutableStateOf(false) }
+    val canCursor = remote?.hasCursor == true
+    val canAir = remember { AirCursor.available(context) }
+    var air by remember { mutableStateOf(canAir) }
+    val motion = remember { Motion() }
+    var cursorError by remember { mutableStateOf<String?>(null) }
     // Keys pressed while (re)connecting: sent, in order, once connected, instead of being lost.
     val waiting = remember { mutableListOf<Int>() }
 
@@ -255,6 +263,42 @@ fun RemoteScreen(host: String, tvName: String, onBack: () -> Unit) {
         }
     }
 
+    // The pointer's moves go one report at a time, what gathered meanwhile in the next: the TV never falls behind.
+    val pointing = cursor && canCursor
+    LaunchedEffect(remote, pointing) {
+        val r = remote ?: return@LaunchedEffect
+        motion.clear()
+        if (!pointing) return@LaunchedEffect
+        cursorError = null
+        while (true) {
+            val (dx, dy, wheel) = motion.take()
+            if (dx != 0 || dy != 0 || wheel != 0) {
+                try {
+                    r.mouse(dx, dy, wheel = wheel)
+                } catch (e: Exception) {
+                    Telemetry.error(context, "remote_cursor", e)
+                    if (!r.isOpen) return@LaunchedEffect reconnect(null)
+                    cursorError = "The TV didn't take the cursor: ${e.message ?: e.javaClass.simpleName}"
+                    cursor = false
+                    return@LaunchedEffect
+                }
+            }
+            delay(16)
+        }
+    }
+    AirMotion(pointing && air) { dx, dy -> motion.move(dx, dy) }
+
+    fun click() {
+        val r = remote ?: return
+        view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+        scope.launch {
+            runCatching {
+                r.mouse(0, 0, buttons = TvKeys.BUTTON_LEFT)
+                r.mouse(0, 0)
+            }.onFailure { Telemetry.error(context, "remote_click", it) }
+        }
+    }
+
     // The phone's volume buttons turn the TV's volume while connected; otherwise they're the phone's.
     DisposableEffect(ready) {
         HardwareKeys.volume = if (ready) { code -> press(code); true } else null
@@ -336,8 +380,37 @@ fun RemoteScreen(host: String, tvName: String, onBack: () -> Unit) {
                 PairCard(host, onPaired = { attempt++ })
             }
 
-            // 1. The D-pad: the hero.
-            DPad(ready) { press(it) }
+            // 1. The D-pad: the hero. Or, switched to the cursor, the touchpad.
+            if (pointing) {
+                Touchpad(ready, air, onMove = motion::move, onWheel = motion::turn, onClick = ::click)
+            } else {
+                DPad(ready) { press(it) }
+            }
+            if (canCursor || via == "Pairing") {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    FilterChip(
+                        selected = pointing,
+                        onClick = {
+                            cursor = !cursor
+                            if (cursor) Telemetry.event(context, "remote_cursor", "air" to air)
+                        },
+                        enabled = canCursor,
+                        label = { Text("Cursor") },
+                        leadingIcon = { Icon(AppIcons.Mouse, null, Modifier.size(18.dp)) },
+                    )
+                    if (pointing && canAir) {
+                        FilterChip(
+                            selected = air,
+                            onClick = { air = !air },
+                            label = { Text("Air: move the phone") },
+                        )
+                    }
+                }
+                when {
+                    !canCursor -> "The cursor needs USB debugging: the pairing protocol has no pointer."
+                    else -> cursorError
+                }?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            }
 
             // 2. Navigation: Home biggest, Back and Menu either side.
             Row(
