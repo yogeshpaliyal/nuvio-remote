@@ -85,14 +85,14 @@ object TvLink {
 
     /** Off the main thread. The Nuvio apps on that TV, the TV build first, then Stremio. Throws when the TV can't be reached. */
     suspend fun apps(context: Context, host: String): List<NuvioApp> =
-        if (Demo.on) Demo.nuvioApps() else withTv(context, host, ::detect)
+        if (Demo.on) Demo.nuvioApps() else withTv(context, host) { tv -> detect(context, tv) }
 
     /**
      * What Android says opens `nuvio://` (Nuvio's own scheme: every build, and forks that kept it), plus what opens
      * `stremio://` with Nuvio's activity class (forks with their own scheme). The other apps opening stremio:// are
      * Stremio itself (`stremio`: opened with its own link instead of Nuvio's extras).
      */
-    private fun detect(tv: Dadb): List<NuvioApp> {
+    private fun detect(context: Context, tv: Dadb): List<NuvioApp> {
         val query = "cmd package query-activities --brief -a android.intent.action.VIEW -d"
         val out = tv.shell("$query nuvio://open; echo '$SPLIT'; $query stremio://open").output
         val nuvio = components(out.substringBefore(SPLIT))
@@ -105,7 +105,7 @@ object TvLink {
                 pkg = pkg,
                 component = component,
                 version = Regex("""versionName=(\S+)""").find(info)?.groupValues?.get(1),
-                source = source(Regex("""installerPackageName=(\S+)""").find(info)?.groupValues?.get(1)),
+                source = source(context, Regex("""installerPackageName=(\S+)""").find(info)?.groupValues?.get(1)),
                 stremio = component.substringAfter('/') != NUVIO_CLASS && component !in nuvio,
             )
         }.sortedBy { if (it.pkg == "com.nuvio.tv") 0 else if (it.stremio) 2 else 1 }
@@ -183,11 +183,11 @@ object TvLink {
             val tvLink = Links.forTv(link)
             val apps = linkAppsOn(tv, tvLink)
             val target = apps.firstOrNull { it.component == component } ?: apps.firstOrNull()
-                ?: error("No app on the TV opens ${Links.site(link)} links.")
+                ?: error(context.getString(R.string.tv_no_app_for_link, Links.site(link)))
             val flags = "0x" + Integer.toHexString(Rules.flags(link))
             val r = tv.shell("am start -a android.intent.action.VIEW -d ${q(tvLink)} -n ${q(target.component)} -f $flags")
             val out = r.allOutput.trim()
-            if (r.exitCode != 0 || out.contains("Error")) error(out.ifEmpty { "The TV said no (exit ${r.exitCode})." })
+            if (r.exitCode != 0 || out.contains("Error")) error(out.ifEmpty { context.getString(R.string.tv_said_no, r.exitCode) })
             out
         }
 
@@ -200,10 +200,10 @@ object TvLink {
             "$pkg/" + if (cls.startsWith(".")) pkg + cls else cls
         }
 
-    private fun source(installer: String?): String = when (installer) {
-        "com.android.vending" -> "Play Store"
-        "com.google.android.packageinstaller", "com.android.packageinstaller" -> "Installed from an APK"
-        null, "null", "com.android.shell" -> "Installed with ADB"
+    private fun source(context: Context, installer: String?): String = when (installer) {
+        "com.android.vending" -> context.getString(R.string.source_play_store)
+        "com.google.android.packageinstaller", "com.android.packageinstaller" -> context.getString(R.string.source_apk)
+        null, "null", "com.android.shell" -> context.getString(R.string.source_adb)
         else -> installer
     }
 
@@ -230,12 +230,12 @@ object TvLink {
      */
     suspend fun open(context: Context, host: String, t: Title, component: String?): String =
         if (Demo.on) { delay(600); "" } else withTv(context, host) { tv ->
-            val apps = detect(tv)
+            val apps = detect(context, tv)
             val target = apps.firstOrNull { it.component == component } ?: apps.firstOrNull()
-                ?: error("There's no Nuvio or Stremio app on that TV.")
+                ?: error(context.getString(R.string.tv_no_nuvio_app))
             val r = tv.shell(command(t, target.component, target.stremio))
             val out = r.allOutput.trim()
-            if (r.exitCode != 0 || out.contains("Error")) error(out.ifEmpty { "The TV said no (exit ${r.exitCode})." })
+            if (r.exitCode != 0 || out.contains("Error")) error(out.ifEmpty { context.getString(R.string.tv_said_no, r.exitCode) })
             out
         }
 }

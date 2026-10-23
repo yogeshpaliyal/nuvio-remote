@@ -24,6 +24,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
@@ -37,9 +38,9 @@ fun UpdateSheet(r: Updates.Release, onDismiss: () -> Unit) {
     val progress by Updates.progress.collectAsState()
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(if (r.version.isNotBlank()) "Skiff ${r.version}" else "A new Skiff", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+            Text(if (r.version.isNotBlank()) stringResource(R.string.skiff_version, r.version) else stringResource(R.string.new_skiff), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
             Text(
-                "You have ${Updates.current(context)}.",
+                stringResource(R.string.you_have, Updates.current(context)),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -48,13 +49,14 @@ fun UpdateSheet(r: Updates.Release, onDismiss: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 if (r.notes.isNotBlank()) Notes(r.notes)
-                else Text("What's new is on Skiff's Google Play page.", style = MaterialTheme.typography.bodyMedium)
+                else Text(stringResource(R.string.notes_on_play), style = MaterialTheme.typography.bodyMedium)
             }
             Text(
-                if (fromPlay) "Google Play downloads it while you use Skiff, then Skiff restarts into it. Your history stays."
-                else if (Updates.canInstall(context)) "Skiff downloads it, then Android asks you to update. Your history stays."
-                else "The first time, Android asks you to allow Skiff to install apps, and restarts Skiff when you do: " +
-                    "this sheet opens again, tap Update. Then Skiff downloads it and Android asks you to update. Your history stays.",
+                stringResource(
+                    if (fromPlay) R.string.update_help_play
+                    else if (Updates.canInstall(context)) R.string.update_help_apk
+                    else R.string.update_help_allow,
+                ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -64,17 +66,17 @@ fun UpdateSheet(r: Updates.Release, onDismiss: () -> Unit) {
                     if (p.fraction != null) LinearProgressIndicator(progress = { p.fraction }, modifier = Modifier.fillMaxWidth())
                     else LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                     Text(
-                        "Downloading" + (p.fraction?.let { " ${(it * 100).toInt()}%" } ?: "…"),
+                        p.fraction?.let { stringResource(R.string.downloading_percent, (it * 100).toInt()) } ?: stringResource(R.string.downloading),
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
-                Updates.Progress.Installing -> Text("Installing: confirm on the screen Android shows.", style = MaterialTheme.typography.bodySmall)
+                Updates.Progress.Installing -> Text(stringResource(R.string.installing_confirm), style = MaterialTheme.typography.bodySmall)
                 is Updates.Progress.Problem -> Text(p.message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                 null -> {}
             }
             val busy = progress is Updates.Progress.Downloading || progress == Updates.Progress.Installing
             Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
-                TextButton(onClick = { Updates.later(context, r); onDismiss(); Telemetry.event(context, "update_later") }, enabled = !busy) { Text("Later") }
+                TextButton(onClick = { Updates.later(context, r); onDismiss(); Telemetry.event(context, "update_later") }, enabled = !busy) { Text(stringResource(R.string.later)) }
                 Spacer(Modifier.width(8.dp))
                 Button(
                     onClick = {
@@ -83,7 +85,7 @@ fun UpdateSheet(r: Updates.Release, onDismiss: () -> Unit) {
                         if (fromPlay) onDismiss()
                     },
                     enabled = !busy,
-                ) { Text(if (progress is Updates.Progress.Problem) "Try again" else "Update") }
+                ) { Text(stringResource(if (progress is Updates.Progress.Problem) R.string.try_again else R.string.update)) }
             }
         }
     }

@@ -25,7 +25,7 @@ class InstallReceiver : BroadcastReceiver() {
             else -> {
                 val why = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)
                 Updates.progressState.value = Updates.Progress.Problem(
-                    "Android didn't install it" + (why?.let { ": $it" } ?: "") + ". Try again, or get the APK from GitHub.",
+                    if (why != null) context.getString(R.string.android_didnt_install_why, why) else context.getString(R.string.android_didnt_install),
                 )
             }
         }

@@ -79,6 +79,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -120,7 +121,7 @@ fun RemoteScreen(host: String, tvName: String, onBack: () -> Unit) {
         remote?.close()
         remote = null
         if (host.isBlank()) {
-            error = "Pick a TV first."
+            error = context.getString(R.string.pick_tv_first)
             return@LaunchedEffect
         }
         if (Demo.on) {
@@ -128,16 +129,16 @@ fun RemoteScreen(host: String, tvName: String, onBack: () -> Unit) {
             via = "USB debugging"
             return@LaunchedEffect
         }
-        val name = tvName.ifEmpty { "the TV" }
+        val name = tvName.ifEmpty { context.getString(R.string.the_tv) }
         suspend fun viaAdb(): Boolean = try {
             remote = TvLink.remote(context, host)
             via = "USB debugging"
             error = null
-            ActivityLog.add(context, "Remote connected", via)
+            ActivityLog.add(context, context.getString(R.string.log_remote_connected), via)
             Telemetry.event(context, "remote_connect", "via" to (if (via == "Pairing") "pairing" else "adb"))
             true
         } catch (e: Exception) {
-            error = "Couldn't reach $name over USB debugging: ${e.message ?: e.javaClass.simpleName}"
+            error = context.getString(R.string.couldnt_reach_adb, name, e.message ?: e.javaClass.simpleName)
             Telemetry.error(context, "remote_connect_adb", e)
             false
         }
@@ -145,33 +146,33 @@ fun RemoteScreen(host: String, tvName: String, onBack: () -> Unit) {
             remote = Atv.connect(context, host)
             via = "Pairing"
             error = null
-            ActivityLog.add(context, "Remote connected", via)
+            ActivityLog.add(context, context.getString(R.string.log_remote_connected), via)
             Telemetry.event(context, "remote_connect", "via" to (if (via == "Pairing") "pairing" else "adb"))
             true
         } catch (e: Exception) {
-            error = e.message ?: "Pair with $name to use the remote."
+            error = e.message ?: context.getString(R.string.pair_to_use_remote, name)
             Telemetry.error(context, "remote_connect_pairing", e)
             false
         }
         val paired = Atv.isPaired(context, host)
         when (mode) {
             Connection.Via.ADB -> viaAdb()
-            Connection.Via.PAIRING -> if (paired) viaPairing() else error = "Pair with $name to use the remote (Settings: Pairing only)."
+            Connection.Via.PAIRING -> if (paired) viaPairing() else error = context.getString(R.string.pair_to_use_remote_pairing_only, name)
             Connection.Via.AUTO -> {
                 val adb = TvLink.check(context, host)
                 when {
                     adb == TvLink.Adb.ALLOWED -> viaAdb() || (paired && viaPairing())
                     paired -> viaPairing()
                     // USB debugging off (a Google TV Streamer, most TVs): nothing to try but pairing.
-                    adb == TvLink.Adb.OFF -> error = "Pair with $name to use the remote: no USB debugging needed."
-                    !viaAdb() -> error = "Pair with $name to use the remote: no USB debugging needed."
+                    adb == TvLink.Adb.OFF -> error = context.getString(R.string.pair_to_use_remote_no_adb, name)
+                    !viaAdb() -> error = context.getString(R.string.pair_to_use_remote_no_adb, name)
                 }
             }
         }
     }
     DisposableEffect(Unit) { onDispose { remote?.close() } }
 
-    fun keyName(code: Int) = "Key " + KeyEvent.keyCodeToString(code).removePrefix("KEYCODE_")
+    fun keyName(code: Int) = context.getString(R.string.log_key, KeyEvent.keyCodeToString(code).removePrefix("KEYCODE_"))
 
     /** Reconnects, the key kept to send once connected (the TV may have closed this remote for another phone's). */
     fun reconnect(code: Int?) {
@@ -189,7 +190,7 @@ fun RemoteScreen(host: String, tvName: String, onBack: () -> Unit) {
         while (waiting.isNotEmpty()) {
             val code = waiting.removeAt(0)
             runCatching { r.key(code) }
-                .onSuccess { ActivityLog.add(context, keyName(code) + " (after reconnecting)", via) }
+                .onSuccess { ActivityLog.add(context, context.getString(R.string.log_after_reconnecting, keyName(code)), via) }
                 .onFailure { ActivityLog.add(context, keyName(code), via, ok = false) }
         }
     }
@@ -250,8 +251,8 @@ fun RemoteScreen(host: String, tvName: String, onBack: () -> Unit) {
         view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
         scope.launch {
             runCatching { r.text(t) }
-                .onSuccess { typed = ""; ActivityLog.add(context, "Typed “$t”", via); Telemetry.event(context, "remote_type", "ok" to true) }
-                .onFailure { ActivityLog.add(context, "Typed “$t”", via, ok = false); Telemetry.event(context, "remote_type", "ok" to false); Telemetry.error(context, "remote_type", it) }
+                .onSuccess { typed = ""; ActivityLog.add(context, context.getString(R.string.log_typed, t), via); Telemetry.event(context, "remote_type", "ok" to true) }
+                .onFailure { ActivityLog.add(context, context.getString(R.string.log_typed, t), via, ok = false); Telemetry.event(context, "remote_type", "ok" to false); Telemetry.error(context, "remote_type", it) }
         }
     }
 
@@ -266,7 +267,7 @@ fun RemoteScreen(host: String, tvName: String, onBack: () -> Unit) {
             TopAppBar(
                 title = {
                     Column {
-                        Text(tvName.ifEmpty { "Remote" }, fontWeight = FontWeight.SemiBold)
+                        Text(tvName.ifEmpty { stringResource(R.string.remote) }, fontWeight = FontWeight.SemiBold)
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(
                                 Modifier.size(8.dp).clip(CircleShape).background(
@@ -279,14 +280,18 @@ fun RemoteScreen(host: String, tvName: String, onBack: () -> Unit) {
                             )
                             Spacer(Modifier.width(6.dp))
                             Text(
-                                when { error != null -> "Not connected"; ready -> "Connected · $via"; else -> "Connecting…" },
+                                when {
+                                    error != null -> stringResource(R.string.not_connected)
+                                    ready -> stringResource(R.string.connected_via, viaLabel(via))
+                                    else -> stringResource(R.string.connecting)
+                                },
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }
                 },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back to Skiff") } },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.back_to_skiff)) } },
                 actions = {
                     // Sleep / wake (KEYCODE_POWER toggles it on Android TV): apart, and red.
                     IconButton(
@@ -296,7 +301,7 @@ fun RemoteScreen(host: String, tvName: String, onBack: () -> Unit) {
                             containerColor = MaterialTheme.colorScheme.errorContainer,
                             contentColor = MaterialTheme.colorScheme.onErrorContainer,
                         ),
-                    ) { Icon(AppIcons.Power, "Power") }
+                    ) { Icon(AppIcons.Power, stringResource(R.string.power)) }
                     Spacer(Modifier.width(8.dp))
                 },
             )
@@ -316,7 +321,7 @@ fun RemoteScreen(host: String, tvName: String, onBack: () -> Unit) {
                         TextButton(onClick = { attempt++ }) {
                             Icon(Icons.Rounded.Refresh, null, Modifier.size(18.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text("Retry")
+                            Text(stringResource(R.string.retry))
                         }
                     }
                 }
@@ -325,7 +330,7 @@ fun RemoteScreen(host: String, tvName: String, onBack: () -> Unit) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     LoadingIndicator(Modifier.size(32.dp))
                     Spacer(Modifier.width(12.dp))
-                    Text("Connecting…", style = MaterialTheme.typography.bodyMedium)
+                    Text(stringResource(R.string.connecting), style = MaterialTheme.typography.bodyMedium)
                 }
             }
 
@@ -345,22 +350,22 @@ fun RemoteScreen(host: String, tvName: String, onBack: () -> Unit) {
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.Bottom,
             ) {
-                LabeledKey("Back", ready) { RoundKey(Icons.AutoMirrored.Rounded.ArrowBack, "Back", 60.dp, ready, Tone.Secondary) { press(KeyEvent.KEYCODE_BACK) } }
-                LabeledKey("Home", ready) { RoundKey(Icons.Rounded.Home, "Home", 76.dp, ready, Tone.Primary) { press(KeyEvent.KEYCODE_HOME) } }
-                LabeledKey("Menu", ready) { RoundKey(Icons.Rounded.Menu, "Menu", 60.dp, ready, Tone.Secondary) { press(KeyEvent.KEYCODE_MENU) } }
+                LabeledKey(stringResource(R.string.back), ready) { RoundKey(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.back), 60.dp, ready, Tone.Secondary) { press(KeyEvent.KEYCODE_BACK) } }
+                LabeledKey(stringResource(R.string.home), ready) { RoundKey(Icons.Rounded.Home, stringResource(R.string.home), 76.dp, ready, Tone.Primary) { press(KeyEvent.KEYCODE_HOME) } }
+                LabeledKey(stringResource(R.string.menu), ready) { RoundKey(Icons.Rounded.Menu, stringResource(R.string.menu), 60.dp, ready, Tone.Secondary) { press(KeyEvent.KEYCODE_MENU) } }
             }
 
             // 3. Volume rocker and playback, as two capsules.
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                Capsule("Volume", Modifier.weight(1f)) {
-                    CapsuleKey(AppIcons.VolumeDown, "Volume down", ready, repeat = true) { press(KeyEvent.KEYCODE_VOLUME_DOWN) }
-                    CapsuleKey(AppIcons.VolumeOff, "Mute", ready, small = true) { press(KeyEvent.KEYCODE_VOLUME_MUTE) }
-                    CapsuleKey(AppIcons.VolumeUp, "Volume up", ready, repeat = true) { press(KeyEvent.KEYCODE_VOLUME_UP) }
+                Capsule(stringResource(R.string.volume), Modifier.weight(1f)) {
+                    CapsuleKey(AppIcons.VolumeDown, stringResource(R.string.volume_down), ready, repeat = true) { press(KeyEvent.KEYCODE_VOLUME_DOWN) }
+                    CapsuleKey(AppIcons.VolumeOff, stringResource(R.string.mute), ready, small = true) { press(KeyEvent.KEYCODE_VOLUME_MUTE) }
+                    CapsuleKey(AppIcons.VolumeUp, stringResource(R.string.volume_up), ready, repeat = true) { press(KeyEvent.KEYCODE_VOLUME_UP) }
                 }
-                Capsule("Playback", Modifier.weight(1f)) {
-                    CapsuleKey(AppIcons.FastRewind, "Rewind", ready, repeat = true, small = true) { press(KeyEvent.KEYCODE_MEDIA_REWIND) }
-                    RoundKey(AppIcons.PlayPause, "Play / pause", 52.dp, ready, Tone.Tertiary) { press(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE) }
-                    CapsuleKey(AppIcons.FastForward, "Forward", ready, repeat = true, small = true) { press(KeyEvent.KEYCODE_MEDIA_FAST_FORWARD) }
+                Capsule(stringResource(R.string.playback), Modifier.weight(1f)) {
+                    CapsuleKey(AppIcons.FastRewind, stringResource(R.string.rewind), ready, repeat = true, small = true) { press(KeyEvent.KEYCODE_MEDIA_REWIND) }
+                    RoundKey(AppIcons.PlayPause, stringResource(R.string.play_pause), 52.dp, ready, Tone.Tertiary) { press(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE) }
+                    CapsuleKey(AppIcons.FastForward, stringResource(R.string.forward), ready, repeat = true, small = true) { press(KeyEvent.KEYCODE_MEDIA_FAST_FORWARD) }
                 }
             }
 
@@ -369,19 +374,19 @@ fun RemoteScreen(host: String, tvName: String, onBack: () -> Unit) {
                 FilledTonalButton(onClick = { typing = true }, enabled = ready) {
                     Icon(AppIcons.Keyboard, null, Modifier.size(20.dp))
                     Spacer(Modifier.width(10.dp))
-                    Text("Type on the TV")
+                    Text(stringResource(R.string.type_on_tv))
                 }
             }
             AnimatedVisibility(typing, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
                 OutlinedTextField(
                     value = typed,
                     onValueChange = { typed = it; editedAt = System.currentTimeMillis() },
-                    label = { Text("Type on the TV") },
-                    placeholder = { Text("Select a search box on the TV first") },
-                    supportingText = if (live) { { Text("Synced with the TV's search box as you type") } } else null,
+                    label = { Text(stringResource(R.string.type_on_tv)) },
+                    placeholder = { Text(stringResource(R.string.type_placeholder)) },
+                    supportingText = if (live) { { Text(stringResource(R.string.type_synced)) } } else null,
                     leadingIcon = { Icon(AppIcons.Keyboard, null) },
                     trailingIcon = {
-                        if (!live) TextButton(onClick = { type() }, enabled = ready && typed.isNotEmpty()) { Text("Send") }
+                        if (!live) TextButton(onClick = { type() }, enabled = ready && typed.isNotEmpty()) { Text(stringResource(R.string.send)) }
                     },
                     singleLine = true,
                     shape = MaterialTheme.shapes.extraLarge,
@@ -409,10 +414,10 @@ private fun DPad(enabled: Boolean, onKey: (Int) -> Unit) {
         Box(Modifier.fillMaxSize().padding(10.dp)) {
             val arrow = Modifier.size(width = 120.dp, height = 84.dp)
             val side = Modifier.size(width = 84.dp, height = 120.dp)
-            PadKey(Icons.Rounded.KeyboardArrowUp, "Up", enabled, arrow.align(Alignment.TopCenter)) { onKey(KeyEvent.KEYCODE_DPAD_UP) }
-            PadKey(Icons.Rounded.KeyboardArrowDown, "Down", enabled, arrow.align(Alignment.BottomCenter)) { onKey(KeyEvent.KEYCODE_DPAD_DOWN) }
-            PadKey(Icons.Rounded.KeyboardArrowLeft, "Left", enabled, side.align(Alignment.CenterStart)) { onKey(KeyEvent.KEYCODE_DPAD_LEFT) }
-            PadKey(Icons.Rounded.KeyboardArrowRight, "Right", enabled, side.align(Alignment.CenterEnd)) { onKey(KeyEvent.KEYCODE_DPAD_RIGHT) }
+            PadKey(Icons.Rounded.KeyboardArrowUp, stringResource(R.string.up), enabled, arrow.align(Alignment.TopCenter)) { onKey(KeyEvent.KEYCODE_DPAD_UP) }
+            PadKey(Icons.Rounded.KeyboardArrowDown, stringResource(R.string.down), enabled, arrow.align(Alignment.BottomCenter)) { onKey(KeyEvent.KEYCODE_DPAD_DOWN) }
+            PadKey(Icons.Rounded.KeyboardArrowLeft, stringResource(R.string.left), enabled, side.align(Alignment.CenterStart)) { onKey(KeyEvent.KEYCODE_DPAD_LEFT) }
+            PadKey(Icons.Rounded.KeyboardArrowRight, stringResource(R.string.right), enabled, side.align(Alignment.CenterEnd)) { onKey(KeyEvent.KEYCODE_DPAD_RIGHT) }
             Pressable(
                 enabled = enabled, repeat = false, shape = CircleShape,
                 rest = MaterialTheme.colorScheme.primary, pressed = MaterialTheme.colorScheme.primaryContainer,
@@ -420,7 +425,7 @@ private fun DPad(enabled: Boolean, onKey: (Int) -> Unit) {
                 onPress = { onKey(KeyEvent.KEYCODE_DPAD_CENTER) },
             ) { pressedNow ->
                 Text(
-                    "OK", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold,
+                    stringResource(R.string.ok), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold,
                     color = if (pressedNow) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onPrimary,
                 )
             }

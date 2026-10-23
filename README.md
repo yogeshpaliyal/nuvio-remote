@@ -106,6 +106,13 @@ install worked, with how (pairing or USB debugging) and, for links, the site (yo
 failed, with the kind of error. Never titles, links, typed or searched text, or commands. **Settings → Privacy** turns both off. Titles' names and art come from Cinemeta; history stays on the phone.
 Details: [PRIVACY.md](PRIVACY.md).
 
+## Languages
+
+English, Hindi, Spanish, Portuguese (Brazil), French and German, following the phone's language; on Android 13+,
+Settings → Apps → Skiff → Language picks one for Skiff alone. A translation is one file,
+`app/src/main/res/values-<language>/strings.xml`, with the names of [the English one](app/src/main/res/values/strings.xml):
+corrections and new languages are welcome.
+
 ## Download
 
 Get the APK from [Releases](../../releases/latest). Up to 1.2.0 the app was *Nuvio Remote* (`dev.nuvioremote`); Skiff

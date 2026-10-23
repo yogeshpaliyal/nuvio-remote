@@ -1,5 +1,274 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    Every word Skiff shows. Translations: values-<language>/strings.xml, the same names (a name missing there falls back
+    to this file). Kept in English: Skiff, Nuvio, Stremio, IMDb, Cinemeta, Google TV, ADB and the other names.
+-->
 <resources>
-    <string name="app_name">Skiff</string>
+    <string name="app_name" translatable="false">Skiff</string>
     <string name="tile_remote">Skiff remote</string>
+
+    <!-- Shared -->
+    <string name="the_tv">the TV</string>
+    <string name="via_pairing">Pairing</string>
+    <string name="via_adb">USB debugging</string>
+    <string name="via_automatic">Automatic</string>
+    <string name="back">Back</string>
+    <string name="back_to_skiff">Back to Skiff</string>
+    <string name="back_to_settings">Back to Settings</string>
+    <string name="settings">Settings</string>
+    <string name="remote">Remote</string>
+    <string name="play">Play</string>
+    <string name="pair">Pair</string>
+    <string name="cancel">Cancel</string>
+    <string name="clear">Clear</string>
+    <string name="save">Save</string>
+    <string name="edit">Edit</string>
+    <string name="remove">Remove</string>
+    <string name="selected">Selected</string>
+    <string name="check_again">Check again</string>
+    <string name="checking">Checking…</string>
+    <string name="connecting">Connecting…</string>
+    <string name="movie">Movie</string>
+    <string name="series">Series</string>
+    <string name="season">Season</string>
+    <string name="episode">Episode</string>
+    <string name="episode_short">S%1$d E%2$d</string>
+    <string name="name_shown_in_nuvio">Name shown in Nuvio</string>
+    <string name="save_for_later">Save for later</string>
+    <string name="saved_for_later">Saved for later</string>
+    <string name="couldnt_reach">Couldn\'t reach %1$s: %2$s</string>
+    <string name="skiff_version">Skiff %1$s</string>
+
+    <!-- Main screen -->
+    <string name="history_and_saved">History and saved</string>
+    <string name="settings_update_available">Settings: an update is available</string>
+    <string name="looking_for_tvs">Looking for TVs…</string>
+    <string name="pick_a_tv">Pick a TV</string>
+    <string name="tv_status_paired">%1$s · paired</string>
+    <string name="tv_status_not_paired">%1$s · not paired yet</string>
+    <string name="tv_status_checking">%1$s · checking…</string>
+    <string name="tv_status_adb">%1$s · USB debugging</string>
+    <string name="tv_status_not_connected">%1$s · not connected yet</string>
+    <string name="change_tv">Change TV</string>
+    <string name="hint_pick_tv">Pick a TV above</string>
+    <string name="hint_connect">Connect to %1$s above</string>
+    <string name="hint_checking_link_app">Checking which TV app opens it…</string>
+    <string name="hint_share">Share a page (IMDb, JioHotstar, YouTube…), or paste its link</string>
+    <string name="no_app_for_link">No app on %1$s opens %2$s links</string>
+    <string name="no_app_for_link_install">No app on %1$s opens %2$s links. Install its TV app, then try again.</string>
+    <string name="no_nuvio_app">No Nuvio or Stremio app on %1$s</string>
+    <string name="no_nuvio_app_install">There\'s no Nuvio or Stremio app on %1$s. Install one, then check again.</string>
+    <string name="connecting_adb">Connecting… The first time, accept “Allow USB debugging?” on the TV (tick Always allow).</string>
+    <string name="opened_link_in">Opened “%1$s” in %2$s on %3$s.</string>
+    <string name="opened_link">Opened “%1$s” on %2$s.</string>
+    <string name="opened_title_pick_stream">Opened “%1$s” in %2$s on %3$s: pick a stream there.</string>
+    <string name="playing_title">Playing “%1$s” on %2$s.</string>
+    <string name="couldnt_open">Couldn\'t open it: %1$s</string>
+    <string name="title_name_missing">Couldn\'t find this title\'s name. Type it in, then try again.</string>
+    <string name="pick_tv_then_play">Pick your TV, then play it.</string>
+    <string name="pick_episode_then_play">Pick the season and episode, then play it.</string>
+    <string name="source_not_found">Couldn\'t find that %1$s page\'s title. Pick it below.</string>
+    <string name="connect_to">Connect to %1$s</string>
+    <string name="connect_intro_not_allowed">%1$s is asking “Allow USB debugging?”: allow it (tick Always allow), then Check again. Or pair instead: the TV shows a code, you type it here.</string>
+    <string name="connect_intro">One time only: the TV shows a code, you type it here. Nothing to change in the TV\'s settings.</string>
+    <string name="connect_footer">Already use USB debugging (Developer options)? Turn it on, then check again.</string>
+    <string name="search_placeholder">Search a title, or paste a link</string>
+    <string name="paste">Paste</string>
+    <string name="searching">Searching…</string>
+    <string name="no_title_called">No title called “%1$s”. Try fewer words, or paste its IMDb link.</string>
+    <string name="recent">Recent</string>
+    <string name="see_all">See all</string>
+    <string name="not_on_cinemeta">Not on Cinemeta. Type the title below.</string>
+    <string name="edit_the_name">Edit the name</string>
+    <string name="opens_in_tv_app_for">Opens in the TV\'s app for %1$s</string>
+    <string name="opens_in_stremio_streams">Opens in Stremio, at the streams</string>
+    <string name="opens_in_nuvio_page">Opens in Nuvio, on the title\'s page</string>
+    <string name="checking_which_app">Checking which app opens it…</string>
+    <string name="opens_in">Opens in %1$s</string>
+    <string name="choose_the_app">Choose the app</string>
+    <string name="same_wifi">The phone and the TV on the same Wi-Fi.</string>
+    <string name="your_tv">Your TV</string>
+    <string name="search_again">Search again</string>
+    <string name="looking_for_tvs_wifi">Looking for TVs on your Wi-Fi…</string>
+    <string name="no_tv_found">No TV found on this Wi-Fi. Enter its address.</string>
+    <string name="tv_address">TV address</string>
+    <string name="tv_address_help">On the TV: Settings → Network &amp; Internet</string>
+    <string name="enter_address_instead">Enter an address instead</string>
+    <string name="tv_host_paired">%1$s · paired</string>
+    <string name="tv_host_pair_from_remote">%1$s · pair it from the remote</string>
+    <string name="open_with">Open with</string>
+    <string name="app_nuvio_subtitle">Opens the title\'s page</string>
+    <string name="app_stremio_subtitle">Opens the streams for it (the episode, for a series)</string>
+    <string name="checking_link_app_on">Checking which app on %1$s opens it…</string>
+    <string name="checking_apps_on">Checking the apps on %1$s… The first time, allow USB debugging on the TV.</string>
+
+    <!-- Library -->
+    <string name="library">Library</string>
+    <string name="library_counts">%1$d in history · %2$d saved</string>
+    <string name="history">History</string>
+    <string name="history_empty">Titles and links you share, paste or play show up here.</string>
+    <string name="saved_empty">Tap the bookmark on a title to watch it later.</string>
+    <string name="removed_from_history">Removed “%1$s” from history</string>
+    <string name="removed_from_saved">Removed “%1$s” from saved</string>
+    <string name="undo">Undo</string>
+    <string name="remove_from_history">Remove from history</string>
+    <string name="remove_from_saved">Remove from saved</string>
+    <plurals name="played_times">
+        <item quantity="one">Played once</item>
+        <item quantity="other">Played %1$d times</item>
+    </plurals>
+    <string name="play_on_tv">Play on TV</string>
+    <string name="more">More</string>
+
+    <!-- Remote -->
+    <string name="pick_tv_first">Pick a TV first.</string>
+    <string name="couldnt_reach_adb">Couldn\'t reach %1$s over USB debugging: %2$s</string>
+    <string name="pair_to_use_remote">Pair with %1$s to use the remote.</string>
+    <string name="pair_to_use_remote_pairing_only">Pair with %1$s to use the remote (Settings: Pairing only).</string>
+    <string name="pair_to_use_remote_no_adb">Pair with %1$s to use the remote: no USB debugging needed.</string>
+    <string name="not_connected">Not connected</string>
+    <string name="connected_via">Connected · %1$s</string>
+    <string name="retry">Retry</string>
+    <string name="power">Power</string>
+    <string name="home">Home</string>
+    <string name="menu">Menu</string>
+    <string name="volume">Volume</string>
+    <string name="volume_down">Volume down</string>
+    <string name="mute">Mute</string>
+    <string name="volume_up">Volume up</string>
+    <string name="playback">Playback</string>
+    <string name="rewind">Rewind</string>
+    <string name="play_pause">Play / pause</string>
+    <string name="forward">Forward</string>
+    <string name="up">Up</string>
+    <string name="down">Down</string>
+    <string name="left">Left</string>
+    <string name="right">Right</string>
+    <string name="ok">OK</string>
+    <string name="type_on_tv">Type on the TV</string>
+    <string name="type_placeholder">Select a search box on the TV first</string>
+    <string name="type_synced">Synced with the TV\'s search box as you type</string>
+    <string name="send">Send</string>
+
+    <!-- Pairing -->
+    <string name="pair_title">Pair with this TV</string>
+    <string name="pair_intro">Like the Google TV app: the TV shows a code, you type it here. No developer options or USB debugging.</string>
+    <string name="couldnt_start_pairing">Couldn\'t start pairing: %1$s</string>
+    <string name="code_mismatch">That code doesn\'t match: check it on the TV.</string>
+    <string name="pair_refused">The TV didn\'t accept it. Pair again.</string>
+    <string name="type_code">Type the code shown on the TV.</string>
+    <string name="code_on_tv">Code on the TV</string>
+    <string name="show_code">Show a code on the TV</string>
+
+    <!-- Settings -->
+    <string name="activity">Activity</string>
+    <string name="activity_last">Last: %1$s · %2$s</string>
+    <string name="activity_summary">What Skiff sends to the TV, and how</string>
+    <string name="activity_empty">What Skiff sends to the TV shows here, with how it went: Pairing or USB debugging.</string>
+    <string name="activity_failed">failed</string>
+    <string name="connection">Connection</string>
+    <string name="connection_tv">Connection · %1$s</string>
+    <string name="pick_tv_first_main">Pick a TV first, on Skiff\'s main screen.</string>
+    <string name="paired">Paired</string>
+    <string name="not_paired">Not paired</string>
+    <string name="adb_allowed">Allowed for this phone</string>
+    <string name="adb_not_allowed">On, but this phone isn\'t allowed: on the TV, allow it (tick Always allow), then check again</string>
+    <string name="adb_off">Off (Settings → System → Developer options on the TV)</string>
+    <string name="forget_pairing">Forget pairing</string>
+    <string name="pair_again">Pair again</string>
+    <string name="links_and_titles">Links and titles</string>
+    <string name="remote_help_auto">Automatic: keys and text over USB debugging when this phone is allowed, else over pairing.</string>
+    <string name="link_help_auto">Automatic: over USB debugging when this phone is allowed (Open with lists the TV\'s apps), else over pairing.</string>
+    <string name="help_pairing_only">Only over pairing (the Google TV remote protocol).</string>
+    <string name="help_adb_only">Only over USB debugging (ADB).</string>
+    <string name="link_help_more">Over pairing the TV picks a link\'s app, and a title opens in Nuvio (its page) or Stremio (its streams); over USB debugging you pick the app, the link\'s rules apply, and Nuvio goes straight to the streams.</string>
+    <string name="adb_tools">ADB tools</string>
+    <string name="adb_tools_need">These need USB debugging on %1$s (Settings → System → Developer options), and this phone allowed.</string>
+    <string name="run_command">Run a command</string>
+    <string name="run_command_help">As adb shell runs it, on %1$s. It can change or remove anything on the TV: run only what you know.</string>
+    <string name="command">Command</string>
+    <string name="run">Run</string>
+    <string name="no_output">(no output, exit %1$d)</string>
+    <string name="exit_code">(exit %1$d)</string>
+    <string name="install_apk">Install an APK</string>
+    <string name="install_apk_help">Pick an .apk on this phone: it\'s installed on %1$s (an update keeps the app\'s data).</string>
+    <string name="choose_apk">Choose an APK</string>
+    <string name="the_apk">the APK</string>
+    <string name="installing_on">Installing %1$s on %2$s…</string>
+    <string name="installed_on">Installed %1$s on %2$s.</string>
+    <string name="couldnt_install">Couldn\'t install %1$s: %2$s</string>
+    <string name="privacy">Privacy</string>
+    <string name="share_reports">Share crash reports and usage</string>
+    <string name="share_reports_help">Crashes, and which features are used and how (USB debugging or pairing), through Firebase. Never what you watch.</string>
+    <string name="test_crash">Test crash</string>
+    <string name="about">About</string>
+    <string name="latest_version">You have the latest version.</string>
+    <string name="couldnt_check">Couldn\'t check: %1$s</string>
+    <string name="update_to">Update to %1$s</string>
+    <string name="update_available">Update available</string>
+    <string name="check_for_updates">Check for updates</string>
+    <string name="you_have_see_new">You have %1$s. See what\'s new</string>
+    <string name="version">Version %1$s</string>
+    <string name="report_issue">Report an issue</string>
+    <string name="report_issue_help">On GitHub, with Skiff\'s version and your phone\'s model filled in</string>
+    <string name="privacy_policy">Privacy policy</string>
+    <string name="privacy_policy_help">What Skiff keeps on your phone, and what it sends</string>
+    <string name="demo_mode">Demo mode</string>
+    <string name="demo_tv">Demo TV and history</string>
+    <string name="demo_help">For screenshots: a made-up Living room TV, its apps and a sample history. Nothing is sent. Skiff restarts.</string>
+
+    <!-- Updates -->
+    <string name="new_skiff">A new Skiff</string>
+    <string name="you_have">You have %1$s.</string>
+    <string name="notes_on_play">What\'s new is on Skiff\'s Google Play page.</string>
+    <string name="update_help_play">Google Play downloads it while you use Skiff, then Skiff restarts into it. Your history stays.</string>
+    <string name="update_help_apk">Skiff downloads it, then Android asks you to update. Your history stays.</string>
+    <string name="update_help_allow">The first time, Android asks you to allow Skiff to install apps, and restarts Skiff when you do: this sheet opens again, tap Update. Then Skiff downloads it and Android asks you to update. Your history stays.</string>
+    <string name="downloading">Downloading…</string>
+    <string name="downloading_percent">Downloading %1$d%%</string>
+    <string name="installing_confirm">Installing: confirm on the screen Android shows.</string>
+    <string name="later">Later</string>
+    <string name="try_again">Try again</string>
+    <string name="update">Update</string>
+    <string name="update_allow_install">Allow Skiff to install apps. Android restarts Skiff when you do; the update opens again, tap Update.</string>
+    <string name="couldnt_update">Couldn\'t update: %1$s</string>
+    <string name="download_not_skiff">The download isn\'t Skiff (%1$s)</string>
+    <string name="github_answered">GitHub answered %1$d</string>
+    <string name="download_stopped">The download stopped early</string>
+    <string name="android_didnt_install">Android didn\'t install it. Try again, or get the APK from GitHub.</string>
+    <string name="android_didnt_install_why">Android didn\'t install it: %1$s. Try again, or get the APK from GitHub.</string>
+    <string name="play_no_answer">Google Play didn\'t answer: is Skiff installed from Play?</string>
+
+    <!-- What the TV says (errors) -->
+    <string name="tv_no_app_for_link">No app on the TV opens %1$s links.</string>
+    <string name="tv_no_nuvio_app">There\'s no Nuvio or Stremio app on that TV.</string>
+    <string name="tv_said_no">The TV said no (exit %1$d).</string>
+    <string name="source_play_store">Play Store</string>
+    <string name="source_apk">Installed from an APK</string>
+    <string name="source_adb">Installed with ADB</string>
+    <string name="tv_no_answer_pairing">The TV didn\'t answer. Check it\'s on, and on the same Wi-Fi.</string>
+    <string name="tv_refused_pairing">The TV refused pairing (status %1$d).</string>
+    <string name="tv_unexpected_pairing">Unexpected message while pairing.</string>
+    <string name="tv_no_code">The TV didn\'t show a code in time. Try again; check it\'s on.</string>
+    <string name="tv_not_paired_yet">Not paired with this TV yet.</string>
+    <string name="tv_no_answer">The TV didn\'t answer. Check it\'s on (not asleep), and on the same network as this phone.</string>
+    <string name="tv_no_remote_service">Couldn\'t reach the TV\'s remote service. Check it\'s on, and on the same network as this phone.</string>
+    <string name="tv_refused_phone">The TV didn\'t accept this phone: pair again. (%1$s)</string>
+    <string name="tv_remote_not_started_awake">The TV connected but didn\'t start the remote. Wake it up, then try again.</string>
+    <string name="tv_remote_not_started">The TV didn\'t start the remote: pair again. (%1$s)</string>
+    <string name="tv_certificate_changed">This isn\'t the TV paired with (its certificate changed): pair again.</string>
+
+    <!-- Activity log entries (written in the language Skiff was in at the time) -->
+    <string name="log_link">Link %1$s</string>
+    <string name="log_link_app">Link %1$s → %2$s</string>
+    <string name="log_title">%1$s “%2$s”</string>
+    <string name="log_command">Command: %1$s</string>
+    <string name="log_installed">Installed %1$s</string>
+    <string name="log_install">Install %1$s</string>
+    <string name="log_forgot_pairing">Forgot the pairing with %1$s</string>
+    <string name="log_paired_with">Paired with %1$s</string>
+    <string name="log_remote_connected">Remote connected</string>
+    <string name="log_key">Key %1$s</string>
+    <string name="log_after_reconnecting">%1$s (after reconnecting)</string>
+    <string name="log_typed">Typed “%1$s”</string>
 </resources>

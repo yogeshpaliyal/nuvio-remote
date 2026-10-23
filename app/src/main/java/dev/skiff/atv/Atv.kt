@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.os.Build
 import dev.skiff.Demo
+import dev.skiff.R
 import dev.skiff.TvKeys
 import android.security.keystore.KeyGenParameterSpec
 import android.util.Log
@@ -94,24 +95,24 @@ object Atv {
         val socket = try {
             open(context, host, PAIRING_PORT, pinned = null)
         } catch (e: java.net.SocketTimeoutException) {
-            error("The TV didn't answer. Check it's on, and on the same Wi-Fi.")
+            error(context.getString(R.string.tv_no_answer_pairing))
         }
         try {
             ProtoWriter.frame(socket.outputStream, Messages.pairingRequest("Skiff on ${Build.MODEL}"))
             while (true) {
                 val m = Messages.Outer(ProtoReader.readFrame(socket.inputStream))
-                if (m.status != 200) error("The TV refused pairing (status ${m.status}).")
+                if (m.status != 200) error(context.getString(R.string.tv_refused_pairing, m.status))
                 when {
                     m.isPairingRequestAck -> ProtoWriter.frame(socket.outputStream, Messages.options())
                     m.isOptions -> ProtoWriter.frame(socket.outputStream, Messages.configuration())
                     m.isConfigurationAck -> return@withContext Pairing(context, host, socket)   // the code is on screen
-                    else -> error("Unexpected message while pairing.")
+                    else -> error(context.getString(R.string.tv_unexpected_pairing))
                 }
             }
             @Suppress("UNREACHABLE_CODE") error("unreachable")
         } catch (e: java.net.SocketTimeoutException) {
             runCatching { socket.close() }
-            error("The TV didn't show a code in time. Try again; check it's on.")
+            error(context.getString(R.string.tv_no_code))
         } catch (e: Exception) {
             runCatching { socket.close() }
             throw e
@@ -304,15 +305,15 @@ object Atv {
      * first), or the TV's certificate isn't the one paired with.
      */
     suspend fun connect(context: Context, host: String): Remote = withContext(Dispatchers.IO) {
-        val pinned = prefs(context).getString(key(host), null) ?: throw NotPaired("Not paired with this TV yet.")
+        val pinned = prefs(context).getString(key(host), null) ?: throw NotPaired(context.getString(R.string.tv_not_paired_yet))
         val socket = try {
             open(context, host, REMOTE_PORT, pinned)
         } catch (e: java.net.SocketTimeoutException) {
-            throw NoAnswer("The TV didn't answer. Check it's on (not asleep), and on the same network as this phone.", e)
+            throw NoAnswer(context.getString(R.string.tv_no_answer), e)
         } catch (e: java.net.ConnectException) {
-            throw NoAnswer("Couldn't reach the TV's remote service. Check it's on, and on the same network as this phone.", e)
+            throw NoAnswer(context.getString(R.string.tv_no_remote_service), e)
         } catch (e: javax.net.ssl.SSLException) {
-            throw NotPaired("The TV didn't accept this phone: pair again. (${e.message})", e)
+            throw NotPaired(context.getString(R.string.tv_refused_phone, e.message.toString()), e)
         }
         socket.soTimeout = 0     // the TV pings every few seconds; quiet otherwise
         val remote = Remote(socket)
@@ -322,10 +323,10 @@ object Atv {
         } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
             // Connected, but the TV never said the remote started: it's busy or asleep, not refusing this phone.
             remote.close()
-            throw NoAnswer("The TV connected but didn't start the remote. Wake it up, then try again.", e)
+            throw NoAnswer(context.getString(R.string.tv_remote_not_started_awake), e)
         } catch (e: Exception) {
             remote.close()
-            throw NotPaired("The TV didn't start the remote: pair again. (${e.message ?: e.javaClass.simpleName})", e)
+            throw NotPaired(context.getString(R.string.tv_remote_not_started, e.message ?: e.javaClass.simpleName), e)
         }
         remote
     }
@@ -349,7 +350,7 @@ object Atv {
         clientCertificate(context)
         val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
         val kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm()).apply { init(keyStore, null) }
-        val tls = SSLContext.getInstance("TLS").apply { init(kmf.keyManagers, arrayOf(pinning(pinned)), null) }
+        val tls = SSLContext.getInstance("TLS").apply { init(kmf.keyManagers, arrayOf(pinning(context, pinned)), null) }
         val socket = tls.socketFactory.createSocket() as SSLSocket
         socket.connect(InetSocketAddress(host.trim(), port), 5_000)
         // Each wait for the TV (the handshake, a pairing step) gives up after 10 s, as androidtvremote2 does: a TV
@@ -364,11 +365,11 @@ object Atv {
      * after that only the one paired with (trust on first use, like SSH).
      */
     @SuppressLint("CustomX509TrustManager", "TrustAllX509TrustManager")
-    private fun pinning(pinned: String?) = object : X509TrustManager {
+    private fun pinning(context: Context, pinned: String?) = object : X509TrustManager {
         override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
         override fun checkServerTrusted(chain: Array<out X509Certificate>, authType: String?) {
             if (pinned != null && fingerprint(chain[0]) != pinned) {
-                throw java.security.cert.CertificateException("This isn't the TV paired with (its certificate changed): pair again.")
+                throw java.security.cert.CertificateException(context.getString(R.string.tv_certificate_changed))
             }
         }
         override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()

@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
@@ -45,16 +46,16 @@ fun ActivityScreen(onBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Activity", fontWeight = FontWeight.SemiBold) },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back to Settings") } },
-                actions = { if (entries.isNotEmpty()) TextButton(onClick = { ActivityLog.clear(context) }) { Text("Clear") } },
+                title = { Text(stringResource(R.string.activity), fontWeight = FontWeight.SemiBold) },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.back_to_settings)) } },
+                actions = { if (entries.isNotEmpty()) TextButton(onClick = { ActivityLog.clear(context) }) { Text(stringResource(R.string.clear)) } },
             )
         },
     ) { inner ->
         if (entries.isEmpty()) {
             Box(Modifier.fillMaxSize().padding(inner).padding(24.dp), contentAlignment = Alignment.Center) {
                 Text(
-                    "What Skiff sends to the TV shows here, with how it went: Pairing or USB debugging.",
+                    stringResource(R.string.activity_empty),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -76,9 +77,13 @@ fun ActivityScreen(onBack: () -> Unit) {
                     Column(Modifier.weight(1f)) {
                         Text(e.what, style = MaterialTheme.typography.bodyLarge, maxLines = 2)
                         Text(
-                            e.via + (if (e.ok) "" else " · failed") + " · " + DateUtils.formatDateTime(
-                                context, e.time, DateUtils.FORMAT_SHOW_TIME or DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_ABBREV_MONTH,
-                            ),
+                            listOfNotNull(
+                                viaLabel(e.via),
+                                if (e.ok) null else stringResource(R.string.activity_failed),
+                                DateUtils.formatDateTime(
+                                    context, e.time, DateUtils.FORMAT_SHOW_TIME or DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_ABBREV_MONTH,
+                                ),
+                            ).joinToString(" · "),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
